@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ommx_da4_adapter"
+dynamic = ["version"]
+description = "An adapter for the Digital Annealer V4 from/to OMMX."
+authors = [{ name = "Jij Inc.", email = "info@j-ij.com" }]
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = [
+    "ommx>=1.8.5,<2.0.0",
+    "requests>=2.25.0,<3.0.0",
+    "pydantic>=2.10.0,<3.0.0",
+]
+
+[project.urls]
+Repository = "https://github.com/Jij-Inc/ommx-da4-adapter"
+Issues = "https://github.com/Jij-Inc/ommx-da4-adapter/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pyright",
+    "pytest",
+    "ruff",
+]
+
+[tool.setuptools]
+packages = ["ommx_da4_adapter"]
+
+[tool.setuptools_scm]
+version_file = "./ommx_da4_adapter/_version.py"

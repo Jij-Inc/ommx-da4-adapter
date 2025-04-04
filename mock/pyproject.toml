@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mock_da4_server"
+version = "0.1.0"
+description = "A mock server for Digital Annealer V4"
+authors = [
+    { name="Jij Inc.", email="info@j-ij.com" }
+]
+readme = "README.md"
+requires-python = ">=3.9, <3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+]
+
+[tool.setuptools]
+packages = ["mock_da4_server"]
