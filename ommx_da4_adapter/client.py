@@ -1,10 +1,9 @@
-import json
 import time
 from typing import Any, Literal, Optional
 import requests
 
 from .exception import OMMXDA4AdapterError
-from .models import QuboRequest, QuboResponse
+from .models import QuboRequest, QuboResponse, JobID
 
 
 class DA4Client:
@@ -66,18 +65,17 @@ class DA4Client:
         return response.json()
 
     def post(
-        self, url: str, data: dict[str, Any], headers: dict[str, str]
+        self, url: str, serialized_body: str, headers: dict[str, str]
     ) -> dict[str, Any]:
         """wrapper of `requests.post`.
 
         :param url: The endpoint path
-        :param data: The data to be sent in the request body
+        :param serialized_body: The serialized data to be sent in the request body
         :param headers: HTTP request headers
         :return: json dict
         :raises OMMXDA4AdapterError: If an HTTP status other than 200s is returned
         """
-        serialized_data = json.dumps(data)
-        response = requests.post(self._url + url, headers=headers, data=serialized_data)
+        response = requests.post(self._url + url, headers=headers, data=serialized_body)
         try:
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
@@ -118,7 +116,9 @@ class DA4Client:
         :param blob_account_name: X-Storage-Account-Name. Defaults to None.
         :return: The job ID
         """
-        qubo_request_dict = qubo_request.model_dump(exclude_none=True, by_alias=True)
+        serialized_body = qubo_request.model_dump_json(
+            exclude_none=True, by_alias=True
+        )
 
         if (blob_sas_token is not None) and (blob_account_name is not None):
             da4_headers = {
@@ -137,7 +137,7 @@ class DA4Client:
 
         api_url = f"/{self._version}/async/qubo/solve"
 
-        response = self.post(api_url, qubo_request_dict, da4_headers)
+        response = self.post(api_url, serialized_body, da4_headers)
         return response["job_id"]
 
     def get_jobs(self) -> list[dict[str, str]]:
@@ -193,9 +193,9 @@ class DA4Client:
         :raises OMMXDA4AdapterError: If an HTTP status other than 200s is returned
         """
         api_url = self._api_url_jobs + "/cancel"
-        data = {"job_id": job_id}
+        serialized_body = JobID(job_id=job_id).model_dump_json()
         try:
-            self.post(api_url, data, self._headers)
+            self.post(api_url, serialized_body, self._headers)
             return True
         except OMMXDA4AdapterError:
             return False
