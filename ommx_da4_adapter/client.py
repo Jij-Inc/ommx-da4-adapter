@@ -70,7 +70,7 @@ class DA4Client:
         """wrapper of `requests.post`.
 
         :param url: The endpoint path
-        :param serialized_body: The serialized data to be sent in the request body
+        :param serialized_body: JSON string to send as the request body
         :param headers: HTTP request headers
         :return: json dict
         :raises OMMXDA4AdapterError: If an HTTP status other than 200s is returned
