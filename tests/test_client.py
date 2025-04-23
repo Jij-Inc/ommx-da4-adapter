@@ -278,7 +278,7 @@ class TestDA4Client(unittest.TestCase):
         mock_post.assert_called_once_with(
             "/v4/async/jobs/cancel",
             JobID(job_id=job_id).model_dump_json(),
-            self.expected_headers
+            self.expected_headers,
         )
         self.assertTrue(result)
 

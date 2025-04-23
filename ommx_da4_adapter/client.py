@@ -116,9 +116,7 @@ class DA4Client:
         :param blob_account_name: X-Storage-Account-Name. Defaults to None.
         :return: The job ID
         """
-        serialized_body = qubo_request.model_dump_json(
-            exclude_none=True, by_alias=True
-        )
+        serialized_body = qubo_request.model_dump_json(exclude_none=True, by_alias=True)
 
         if (blob_sas_token is not None) and (blob_account_name is not None):
             da4_headers = {

@@ -208,5 +208,6 @@ class QuboResponse(pydantic.BaseModel):
     qubo_solution: QuboSolutionList
     status: Literal["Done", "Deleted"]
 
+
 class JobID(pydantic.BaseModel):
     job_id: str
