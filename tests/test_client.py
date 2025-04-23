@@ -10,6 +10,7 @@ from ommx_da4_adapter.models import (
     BinaryPolynomial,
     BinaryPolynomialTerm,
     FujitsuDA3Solver,
+    JobID,
     QuboRequest,
 )
 
@@ -85,7 +86,7 @@ class TestDA4Client(unittest.TestCase):
         mock_response.json.return_value = {"test": "data"}
         mock_post.return_value = mock_response
 
-        test_data = {"key": "value"}
+        test_data = json.dumps({"key": "value"})
         test_headers = {"header": "value"}
 
         result = self.client.post("/test/endpoint", test_data, test_headers)
@@ -93,7 +94,7 @@ class TestDA4Client(unittest.TestCase):
         mock_post.assert_called_once_with(
             self.url + "/test/endpoint",
             headers=test_headers,
-            data=json.dumps(test_data),
+            data=test_data,
         )
         self.assertEqual(result, {"test": "data"})
 
@@ -106,7 +107,7 @@ class TestDA4Client(unittest.TestCase):
         mock_response.text = "Error message"
         mock_post.return_value = mock_response
 
-        test_data = {"key": "value"}
+        test_data = json.dumps({"key": "value"})
         test_headers = {"header": "value"}
 
         with self.assertRaises(OMMXDA4AdapterError):
@@ -160,7 +161,7 @@ class TestDA4Client(unittest.TestCase):
 
         mock_post.assert_called_once_with(
             "/v4/async/qubo/solve",
-            qubo_request.model_dump(exclude_none=True, by_alias=True),
+            qubo_request.model_dump_json(exclude_none=True, by_alias=True),
             self.expected_headers,
         )
         self.assertEqual(result, "test-job-id")
@@ -202,7 +203,7 @@ class TestDA4Client(unittest.TestCase):
 
         mock_post.assert_called_once_with(
             "/v4/async/qubo/solve",
-            qubo_request.model_dump(exclude_none=True, by_alias=True),
+            qubo_request.model_dump_json(exclude_none=True, by_alias=True),
             expected_headers,
         )
         self.assertEqual(result, "test-job-id")
@@ -275,7 +276,9 @@ class TestDA4Client(unittest.TestCase):
         result = self.client.post_job_cancel(job_id)
 
         mock_post.assert_called_once_with(
-            "/v4/async/jobs/cancel", {"job_id": job_id}, self.expected_headers
+            "/v4/async/jobs/cancel",
+            JobID(job_id=job_id).model_dump_json(),
+            self.expected_headers,
         )
         self.assertTrue(result)
 
@@ -287,7 +290,9 @@ class TestDA4Client(unittest.TestCase):
         result = self.client.post_job_cancel(job_id)
 
         mock_post.assert_called_once_with(
-            "/v4/async/jobs/cancel", {"job_id": job_id}, self.expected_headers
+            "/v4/async/jobs/cancel",
+            JobID(job_id=job_id).model_dump_json(),
+            self.expected_headers,
         )
         self.assertFalse(result)
 
