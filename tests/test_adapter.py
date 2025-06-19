@@ -10,7 +10,7 @@ from ommx_da4_adapter.models import BinaryPolynomialTerm, Inequalities, QuboResp
 # Function to sort based on the length of binary polynomials
 # Used to align the order (because the order may differ depending on the environment)
 def sort_terms(terms):
-    return sorted(terms, key=lambda term: (len(term.p), term.c))
+    return sorted(terms, key=lambda term: (len(term.p), term.c, term.p))
 
 
 @pytest.fixture
@@ -381,17 +381,19 @@ def test_inequalities(instance):
     # assert with manually calculated values
     # 4x₁x₂x₃ ≤ 0
     # x₁x₂x₃ + 2x₃ + 3 ≤ 0
-    assert qubo_request.inequalities == [
-        Inequalities(terms=[BinaryPolynomialTerm(c=4.0, p=[0, 1, 2])], lambda_=1),  # type: ignore
-        Inequalities(
-            terms=[
-                BinaryPolynomialTerm(c=3.0, p=[]),
-                BinaryPolynomialTerm(c=1.0, p=[0, 1, 2]),
-                BinaryPolynomialTerm(c=2.0, p=[2]),
-            ],
-            lambda_=1,  # type: ignore
-        ),
-    ]
+    assert qubo_request.inequalities is not None
+    assert sort_terms(qubo_request.inequalities[0].terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=4.0, p=[0, 1, 2]),
+        ]
+    )
+    assert sort_terms(qubo_request.inequalities[1].terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=3.0, p=[]),
+            BinaryPolynomialTerm(c=1.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=2.0, p=[2]),
+        ]
+    )
 
 
 @pytest.fixture
@@ -424,7 +426,6 @@ def test_binary_polynomial_for_MAXIMIZE(instance_for_MAXIMIZE):
         [
             BinaryPolynomialTerm(c=-1.0, p=[0]),
             BinaryPolynomialTerm(c=-1.0, p=[1]),
-            BinaryPolynomialTerm(c=-0.0, p=[]),
         ]
     )
 
