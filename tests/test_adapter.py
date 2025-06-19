@@ -499,9 +499,6 @@ def instance_with_a_one_hot_constraint():
         constraint_hints=hints,
     )
 
-    # for constraint in ommx_instance.get_constraints():
-    #     constraint.set_id(0)
-
     return ommx_instance
 
 
