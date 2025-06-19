@@ -4,7 +4,7 @@ from ommx.v1 import Constraint, DecisionVariable, Instance, ConstraintHints, One
 
 from ommx_da4_adapter import OMMXDA4Adapter
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
-from ommx_da4_adapter.models import BinaryPolynomialTerm, Inequalities, QuboResponse
+from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse
 
 
 # Function to sort based on the length of binary polynomials
