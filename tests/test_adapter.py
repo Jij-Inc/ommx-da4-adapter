@@ -1,8 +1,6 @@
 import pytest
 
-from ommx.v1 import Constraint, DecisionVariable, Instance
-from ommx.v1.constraint_hints_pb2 import ConstraintHints
-from ommx.v1.one_hot_pb2 import OneHot
+from ommx.v1 import Constraint, DecisionVariable, Instance, ConstraintHints, OneHot
 
 from ommx_da4_adapter import OMMXDA4Adapter
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
@@ -485,19 +483,23 @@ def test_no_inequalities(instance_for_no_inequalities):
 def instance_with_a_one_hot_constraint():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    constraint = [x[1] + x[2] + x[3] == 1]
+    constraint = x[1] + x[2] + x[3] == 1
+
+    assert isinstance(constraint, Constraint)
+    constraint.set_id(0)
+
+    hints = ConstraintHints(one_hot_constraints=[OneHot(id=0, variables=[1, 2, 3])])
+
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=constraint,
+        constraints=[constraint],
         sense=Instance.MAXIMIZE,
+        constraint_hints=hints,
     )
 
-    hints = ConstraintHints(one_hot_constraints=[OneHot(decision_variables=[1, 2, 3])])
-    ommx_instance.raw.constraint_hints.MergeFrom(hints)
-
-    for constraint in ommx_instance.get_constraints():
-        constraint.set_id(0)
+    # for constraint in ommx_instance.get_constraints():
+    #     constraint.set_id(0)
 
     return ommx_instance
 
@@ -566,19 +568,20 @@ def instance_with_various_constraints():
     constraint_2.set_id(1)
     constraint_3.set_id(2)
 
+    hints = ConstraintHints(
+        one_hot_constraints=[
+            OneHot(id=0, variables=[0, 1, 2]),
+            OneHot(id=1, variables=[3, 4, 5, 6, 7]),
+        ]
+    )
+
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
         constraints=[constraint_1, constraint_2, constraint_3],
         sense=Instance.MAXIMIZE,
+        constraint_hints=hints,
     )
-    hints = ConstraintHints(
-        one_hot_constraints=[
-            OneHot(constraint_id=0, decision_variables=[0, 1, 2]),
-            OneHot(constraint_id=1, decision_variables=[3, 4, 5, 6, 7]),
-        ]
-    )
-    ommx_instance.raw.constraint_hints.MergeFrom(hints)
 
     return ommx_instance
 
@@ -672,20 +675,20 @@ def instance_with_duplicates():
     constraint_1.set_id(0)
     constraint_2.set_id(1)
 
+    hints = ConstraintHints(
+        one_hot_constraints=[
+            OneHot(id=0, variables=[0, 1]),
+            OneHot(id=1, variables=[1, 2, 3]),
+        ]
+    )
+
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
         constraints=[constraint_1, constraint_2],
         sense=Instance.MAXIMIZE,
+        constraint_hints=hints,
     )
-
-    hints = ConstraintHints(
-        one_hot_constraints=[
-            OneHot(constraint_id=0, decision_variables=[0, 1]),
-            OneHot(constraint_id=1, decision_variables=[1, 2, 3]),
-        ]
-    )
-    ommx_instance.raw.constraint_hints.MergeFrom(hints)
 
     return ommx_instance
 
