@@ -307,7 +307,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         instance = self._ommx_instance
 
-        if len(instance.raw.constraint_hints.one_hot_constraints) == 0:
+        if len(instance.constraint_hints.one_hot_constraints) == 0:
             return 0
         else:
             return 1
@@ -387,7 +387,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         sorted_one_hot_constraints = sorted(
-            instance.raw.constraint_hints.one_hot_constraints,
+            instance.constraint_hints.one_hot_constraints,
             key=lambda x: len(x.variables),
             reverse=True,
         )
