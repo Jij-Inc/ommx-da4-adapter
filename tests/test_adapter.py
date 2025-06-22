@@ -10,7 +10,7 @@ from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse
 # Function to sort based on the length of binary polynomials
 # Used to align the order (because the order may differ depending on the environment)
 def sort_terms(terms):
-    return sorted(terms, key=lambda term: (len(term.p), term.c, term.p))
+    return sorted(terms, key=lambda term: term.p)
 
 
 @pytest.fixture
