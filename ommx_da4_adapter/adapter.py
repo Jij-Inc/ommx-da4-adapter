@@ -276,7 +276,7 @@ class OMMXDA4Adapter(SamplerAdapter):
             terms = constraint.function.terms
             inequalities_terms = [
                 BinaryPolynomialTerm(
-                    c=value, p=self._replace_polynomials_with_variable_map(tuple(key))
+                    c=value, p=self._replace_polynomials_with_variable_map(key)
                 )
                 for key, value in terms.items()
             ]
