@@ -307,7 +307,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         instance = self._ommx_instance
 
-        if len(instance.raw.constraint_hints.one_hot_constraints) == 0:
+        if len(instance.constraint_hints.one_hot_constraints) == 0:
             return 0
         else:
             return 1
@@ -387,8 +387,8 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         sorted_one_hot_constraints = sorted(
-            instance.raw.constraint_hints.one_hot_constraints,
-            key=lambda x: len(x.decision_variables),
+            instance.constraint_hints.one_hot_constraints,
+            key=lambda x: len(x.variables),
             reverse=True,
         )
 
@@ -398,14 +398,14 @@ class OMMXDA4Adapter(SamplerAdapter):
             if any(
                 [
                     variable in used_variables
-                    for variable in one_hot_constraint.decision_variables
+                    for variable in one_hot_constraint.variables
                 ]
             ):
                 continue
 
-            used_variables.update(one_hot_constraint.decision_variables)
-            one_hot_dict[one_hot_constraint.constraint_id] = [
-                variable_id for variable_id in one_hot_constraint.decision_variables
+            used_variables.update(one_hot_constraint.variables)
+            one_hot_dict[one_hot_constraint.id] = [
+                variable_id for variable_id in one_hot_constraint.variables
             ]
 
         return one_hot_dict
