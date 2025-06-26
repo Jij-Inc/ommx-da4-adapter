@@ -30,8 +30,6 @@ ommx_sampleset = OMMXDA4Adapter.sample(
     token="*** your da4 api token ***",
     url="*** da4 url ***",
 )
-
-print(result)
 ```
 
 You can also use the adapter and client separately:
@@ -52,7 +50,5 @@ client = DA4Client(
 qubo_response = client.sample(qubo_request=qubo_request)
 
 ommx_sampleset = adapter.decode_to_sampleset(qubo_response)
-
-print(result)
 ```
 
