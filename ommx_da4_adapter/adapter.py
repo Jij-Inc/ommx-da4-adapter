@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional, Union
+from typing import Literal, Optional, Union
 
 from ommx.adapter import SamplerAdapter
 from ommx.v1 import (
@@ -143,7 +143,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
 
         sample_id: int = 0
-        samples: Samples = Samples({}) # Create empty samples
+        samples: Samples = Samples({})  # Create empty samples
 
         reversed_variable_map = {v: k for k, v in self._variable_map.items()}
 
@@ -159,7 +159,10 @@ class OMMXDA4Adapter(SamplerAdapter):
                     f"Invalid solution configuration: The solution contains an unexpected decision variable id ({e})."
                 )
             next_sample_id = sample_id + solution.frequency
-            samples.append(sample_ids=[i for i in range(sample_id, next_sample_id)], state=State(entries=converted_configuration))
+            samples.append(
+                sample_ids=[i for i in range(sample_id, next_sample_id)],
+                state=State(entries=converted_configuration),
+            )
             sample_id = next_sample_id
 
         return self._ommx_instance.evaluate_samples(samples)
