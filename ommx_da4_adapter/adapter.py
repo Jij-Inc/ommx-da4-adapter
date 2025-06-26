@@ -143,7 +143,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
 
         sample_id: int = 0
-        entries: List[Samples.SamplesEntry] = []
+        samples: Samples = Samples({}) # Create empty samples
 
         reversed_variable_map = {v: k for k, v in self._variable_map.items()}
 
@@ -159,17 +159,8 @@ class OMMXDA4Adapter(SamplerAdapter):
                     f"Invalid solution configuration: The solution contains an unexpected decision variable id ({e})."
                 )
             next_sample_id = sample_id + solution.frequency
-            entries.append(
-                Samples.SamplesEntry(
-                    state=State(entries=converted_configuration),
-                    ids=[i for i in range(sample_id, next_sample_id)],
-                )
-            )
+            samples.append(sample_ids=[i for i in range(sample_id, next_sample_id)], state=State(entries=converted_configuration))
             sample_id = next_sample_id
-
-        samples = Samples(
-            entries=entries,
-        )
 
         return self._ommx_instance.evaluate_samples(samples)
 
@@ -177,7 +168,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         """Check if the decision variables are binary."""
         instance = self._ommx_instance
 
-        for decision_variable in instance.get_decision_variables():
+        for decision_variable in instance.decision_variables:
             if decision_variable.kind != DecisionVariable.BINARY:
                 raise OMMXDA4AdapterError(
                     f"The decision variable must be binary: id {decision_variable.id}"
@@ -226,7 +217,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         # Squared Polynomial with Binary Variables
         squared_terms_dict = {}
-        for constraint in instance.get_constraints():
+        for constraint in instance.constraints:
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
@@ -268,7 +259,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         inequalities_list = []
-        for constraint in instance.get_constraints():
+        for constraint in instance.constraints:
             # skip if not inequality constraints
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 continue
@@ -327,7 +318,7 @@ class OMMXDA4Adapter(SamplerAdapter):
             for variable in variables:
                 variable_map[variable] = index
                 index += 1
-        for decision_variable in instance.get_decision_variables():
+        for decision_variable in instance.decision_variables:
             # skip if already in variable_map
             if decision_variable.id in variable_map:
                 continue
