@@ -6,6 +6,7 @@ from ommx.v1 import (
     SampleSet,
     Constraint,
     DecisionVariable,
+    Solution,
     State,
     Samples,
 )
@@ -106,6 +107,14 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         return self._sampler_input
 
+    @property
+    def solver_input(self) -> QuboRequest:
+        """Get QuboRequest from OMMX instance.
+
+        :return: QuboRequest
+        """
+        return self._sampler_input
+
     @classmethod
     def sample(
         cls,
@@ -134,6 +143,18 @@ class OMMXDA4Adapter(SamplerAdapter):
         qubo_response = client.sample(qubo_request=qubo_request)
 
         return adapter.decode_to_sampleset(qubo_response)
+
+    @classmethod
+    def solve(
+        cls,
+        ommx_instance: Instance,
+        *,
+        token: Optional[str] = None,
+        url: str = "https://api.aispf.global.fujitsu.com/da",
+        version: Literal["v4", "v3c"] = "v4",
+    ) -> Solution:
+        sample_set = cls.sample(ommx_instance, token=token, url=url, version=version)
+        return sample_set.best_feasible
 
     def decode_to_sampleset(self, data: QuboResponse) -> SampleSet:
         """Decode QuboResponse to SampleSet.
@@ -166,6 +187,15 @@ class OMMXDA4Adapter(SamplerAdapter):
             sample_id = next_sample_id
 
         return self._ommx_instance.evaluate_samples(samples)
+
+    def decode(self, data: QuboResponse) -> Solution:
+        """Decode QuboResponse to Solution.
+
+        :param data: The QUBO result data from DA4
+        :return: Solution
+        """
+        sample_set = self.decode_to_sampleset(data)
+        return sample_set.best_feasible
 
     def _check_decision_variable(self):
         """Check if the decision variables are binary."""
