@@ -870,3 +870,157 @@ def test_sampele_without_token(instance_for_sampleset):
         match="token is required. Please set the token to use the DA4 API.",
     ):
         OMMXDA4Adapter.sample(instance_for_sampleset)
+
+
+@pytest.fixture
+def instance_for_solve():
+    # Knapsack Problem
+    v = [10, 13, 18, 31, 7, 15]
+    w = [11, 25, 20, 35, 10, 33]
+    W = 47
+    N = len(v)
+
+    x = [
+        DecisionVariable.binary(
+            id=i,
+            name="x",
+            subscripts=[i],
+        )
+        for i in range(N)
+    ]
+
+    objective = sum(v[i] * x[i] for i in range(N))
+
+    constraint = sum(w[i] * x[i] for i in range(N)) - W <= 0
+    assert isinstance(constraint, Constraint)
+
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=objective,
+        constraints=[constraint],
+        sense=Instance.MAXIMIZE,
+    )
+
+    return instance
+
+
+def test_solve_adapter_default_value(instance_for_solve):
+    adapter = OMMXDA4Adapter(instance_for_solve)
+    qubo_request = adapter.solver_input
+
+    # fujitsuDA3
+    assert qubo_request.fujitsuDA3.time_limit_sec == 10
+    assert qubo_request.fujitsuDA3.target_energy is None
+    assert qubo_request.fujitsuDA3.num_run == 16
+    assert qubo_request.fujitsuDA3.num_group == 1
+    assert qubo_request.fujitsuDA3.num_output_solution == 5
+    assert qubo_request.fujitsuDA3.gs_level == 5
+    assert qubo_request.fujitsuDA3.gs_cutoff == 8000
+    assert qubo_request.fujitsuDA3.one_hot_level == 3
+    assert qubo_request.fujitsuDA3.one_hot_cutoff == 100
+    assert qubo_request.fujitsuDA3.penalty_auto_mode == 1
+    assert qubo_request.fujitsuDA3.penalty_coef == 1
+    assert qubo_request.fujitsuDA3.penalty_inc_rate == 150
+    assert qubo_request.fujitsuDA3.max_penalty_coef == 0
+    assert qubo_request.fujitsuDA3.guidance_config is None
+    assert qubo_request.fujitsuDA3.fixed_config is None
+
+    assert adapter._inequalities_lambda is None
+
+    assert qubo_request.bucket_name is None
+    assert qubo_request.binary_polynomial_object_name is None
+    assert qubo_request.penalty_binary_polynomial_object_name is None
+    assert qubo_request.inequalities_object_name is None
+
+
+def test_decode_to_sample(instance_for_solve):
+    adapter = OMMXDA4Adapter(instance_for_solve)
+
+    # qubo_response from mock
+    qubo_response = {
+        "qubo_solution": {
+            "progress": [
+                {"energy": 0.0, "penalty_energy": 7.0, "time": 0.161},
+                {"energy": -42.0, "penalty_energy": 0.0, "time": 0.355},
+                {"energy": -45.0, "penalty_energy": 0.0, "time": 0.697},
+                {"energy": -46.0, "penalty_energy": 0.0, "time": 1.109},
+                {"energy": -47.0, "penalty_energy": 0.0, "time": 1.331},
+                {"energy": -48.0, "penalty_energy": 0.0, "time": 1.629},
+            ],
+            "result_status": True,
+            "solutions": [
+                {
+                    "energy": -48.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {
+                        "0": False,
+                        "1": True,
+                        "2": False,
+                        "3": True,
+                        "4": True,
+                        "5": False,
+                    },
+                },
+                {
+                    "energy": -48.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {
+                        "0": False,
+                        "1": True,
+                        "2": True,
+                        "3": True,
+                        "4": True,
+                        "5": False,
+                    },
+                },
+                {
+                    "energy": -48.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {
+                        "0": False,
+                        "1": False,
+                        "2": False,
+                        "3": True,
+                        "4": True,
+                        "5": False,
+                    },
+                },
+                {
+                    "energy": -48.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {
+                        "0": True,
+                        "1": False,
+                        "2": True,
+                        "3": False,
+                        "4": False,
+                        "5": True,
+                    },
+                },
+                {
+                    "energy": -48.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {
+                        "0": False,
+                        "1": False,
+                        "2": False,
+                        "3": False,
+                        "4": False,
+                        "5": True,
+                    },
+                },
+            ],
+            "timing": {"solve_time": "11027", "total_elapsed_time": "11062"},
+        },
+        "status": "Done",
+    }
+
+    solution = adapter.decode(QuboResponse(**qubo_response))
+
+    assert solution is not None
+    assert len(solution.decision_variables) == 6
