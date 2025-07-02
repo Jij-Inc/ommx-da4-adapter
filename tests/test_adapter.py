@@ -908,31 +908,34 @@ def test_solve_adapter_default_value(instance_for_solve):
     adapter = OMMXDA4Adapter(instance_for_solve)
     qubo_request = adapter.solver_input
 
-    # fujitsuDA3
-    assert qubo_request.fujitsuDA3.time_limit_sec == 10
-    assert qubo_request.fujitsuDA3.target_energy is None
-    assert qubo_request.fujitsuDA3.num_run == 16
-    assert qubo_request.fujitsuDA3.num_group == 1
-    assert qubo_request.fujitsuDA3.num_output_solution == 5
-    assert qubo_request.fujitsuDA3.gs_level == 5
-    assert qubo_request.fujitsuDA3.gs_cutoff == 8000
-    assert qubo_request.fujitsuDA3.one_hot_level == 3
-    assert qubo_request.fujitsuDA3.one_hot_cutoff == 100
-    assert qubo_request.fujitsuDA3.penalty_auto_mode == 1
-    assert qubo_request.fujitsuDA3.penalty_coef == 1
-    assert qubo_request.fujitsuDA3.penalty_inc_rate == 150
-    assert qubo_request.fujitsuDA3.max_penalty_coef == 0
-    assert qubo_request.fujitsuDA3.guidance_config is None
-    assert qubo_request.fujitsuDA3.fixed_config is None
+    # Expected default values for fujitsuDA3 parameters
+    expected_values = {
+        "time_limit_sec": 10,
+        "target_energy": None,
+        "num_run": 16,
+        "num_group": 1,
+        "num_output_solution": 5,
+        "gs_level": 5,
+        "gs_cutoff": 8000,
+        "one_hot_level": 3,
+        "one_hot_cutoff": 100,
+        "penalty_auto_mode": 1,
+        "penalty_coef": 1,
+        "penalty_inc_rate": 150,
+        "max_penalty_coef": 0,
+        "guidance_config": None,
+        "fixed_config": None,
+    }
 
+    for param, expected in expected_values.items():
+        assert getattr(qubo_request.fujitsuDA3, param) == expected
+
+    # Additional assertions
     assert adapter._inequalities_lambda is None
-
     assert qubo_request.bucket_name is None
     assert qubo_request.binary_polynomial_object_name is None
     assert qubo_request.penalty_binary_polynomial_object_name is None
     assert qubo_request.inequalities_object_name is None
-
-
 def test_decode_to_sample(instance_for_solve):
     adapter = OMMXDA4Adapter(instance_for_solve)
 
