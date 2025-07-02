@@ -153,6 +153,14 @@ class OMMXDA4Adapter(SamplerAdapter):
         url: str = "https://api.aispf.global.fujitsu.com/da",
         version: Literal["v4", "v3c"] = "v4",
     ) -> Solution:
+        """Solve the result in DA4 with DA4Client.
+
+        :param ommx_instance: OMMX instance
+        :param token: Authentication token for DA4 API. Defaults to None.
+        :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
+        :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :return: Solution
+        """
         sample_set = cls.sample(ommx_instance, token=token, url=url, version=version)
         return sample_set.best_feasible
 
