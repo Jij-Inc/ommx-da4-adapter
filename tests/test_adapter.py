@@ -744,7 +744,7 @@ def test_penalty_binary_polynomial_with_duplicates(instance_with_duplicates):
 
 
 @pytest.fixture
-def instance_for_sampleset():
+def instance_knapsack_problem():
     # Knapsack Problem
     v = [10, 13, 18, 31, 7, 15]
     w = [11, 25, 20, 35, 10, 33]
@@ -775,8 +775,8 @@ def instance_for_sampleset():
     return instance
 
 
-def test_decode_to_sampleset(instance_for_sampleset):
-    adapter = OMMXDA4Adapter(instance_for_sampleset)
+def test_decode_to_sampleset(instance_knapsack_problem):
+    adapter = OMMXDA4Adapter(instance_knapsack_problem)
 
     # qubo_response from mock
     qubo_response = {
@@ -869,48 +869,16 @@ def test_decode_to_sampleset(instance_for_sampleset):
     assert len(sampleset.sample_ids) == 5
 
 
-def test_sampele_without_token(instance_for_sampleset):
+def test_sampele_without_token(instance_knapsack_problem):
     with pytest.raises(
         OMMXDA4AdapterError,
         match="token is required. Please set the token to use the DA4 API.",
     ):
-        OMMXDA4Adapter.sample(instance_for_sampleset)
+        OMMXDA4Adapter.sample(instance_knapsack_problem)
 
 
-@pytest.fixture
-def instance_for_solve():
-    # Knapsack Problem
-    v = [10, 13, 18, 31, 7, 15]
-    w = [11, 25, 20, 35, 10, 33]
-    W = 47
-    N = len(v)
-
-    x = [
-        DecisionVariable.binary(
-            id=i,
-            name="x",
-            subscripts=[i],
-        )
-        for i in range(N)
-    ]
-
-    objective = sum(v[i] * x[i] for i in range(N))
-
-    constraint = sum(w[i] * x[i] for i in range(N)) - W <= 0
-    assert isinstance(constraint, Constraint)
-
-    instance = Instance.from_components(
-        decision_variables=x,
-        objective=objective,
-        constraints=[constraint],
-        sense=Instance.MAXIMIZE,
-    )
-
-    return instance
-
-
-def test_solve_adapter_default_value(instance_for_solve):
-    adapter = OMMXDA4Adapter(instance_for_solve)
+def test_solve_adapter_default_value(instance_knapsack_problem):
+    adapter = OMMXDA4Adapter(instance_knapsack_problem)
     qubo_request = adapter.solver_input
 
     # Expected default values for fujitsuDA3 parameters
@@ -943,8 +911,8 @@ def test_solve_adapter_default_value(instance_for_solve):
     assert qubo_request.inequalities_object_name is None
 
 
-def test_decode_to_sample(instance_for_solve):
-    adapter = OMMXDA4Adapter(instance_for_solve)
+def test_decode_to_sample(instance_knapsack_problem):
+    adapter = OMMXDA4Adapter(instance_knapsack_problem)
 
     # qubo_response from mock
     qubo_response = {
