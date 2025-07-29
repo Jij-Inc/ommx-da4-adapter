@@ -1002,3 +1002,91 @@ def test_decode_to_sample(instance_knapsack_problem):
 
     assert solution is not None
     assert len(solution.decision_variables) == 6
+
+def test_partial_evaluate():
+    x = [DecisionVariable.binary(i, name="x", subscripts=[i]) for i in range(3)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[0] + x[1] + x[2],
+        constraints=[(x[0] + x[1] + x[2] <= 1).set_id(0)],
+        sense=Instance.MINIMIZE,
+    )
+    assert instance.used_decision_variables == x
+
+    partial = instance.partial_evaluate({0: 1})
+    # x[0] is no longer present in the problem
+    assert partial.used_decision_variables == x[1:]
+    
+    adapter = OMMXDA4Adapter(partial)
+    qubo_request = adapter.sampler_input
+    
+    assert qubo_request.binary_polynomial is not None
+    expected_terms = sort_terms([
+        BinaryPolynomialTerm(c=1.0, p=[]),
+        BinaryPolynomialTerm(c=1.0, p=[0]),
+        BinaryPolynomialTerm(c=1.0, p=[1]),
+    ])
+    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
+    assert actual_terms == expected_terms
+
+    partial = instance.partial_evaluate({1: 1})
+    assert partial.used_decision_variables == [x[0], x[2]]
+    
+    adapter = OMMXDA4Adapter(partial)
+    qubo_request = adapter.sampler_input
+    
+    assert qubo_request.binary_polynomial is not None
+    expected_terms = sort_terms([
+        BinaryPolynomialTerm(c=1.0, p=[]),
+        BinaryPolynomialTerm(c=1.0, p=[0]),
+        BinaryPolynomialTerm(c=1.0, p=[1]),
+    ])
+    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
+    assert actual_terms == expected_terms
+
+    partial = instance.partial_evaluate({2: 1})
+    assert partial.used_decision_variables == x[0:2]
+    
+    adapter = OMMXDA4Adapter(partial)
+    qubo_request = adapter.sampler_input
+    
+
+    assert qubo_request.binary_polynomial is not None
+    expected_terms = sort_terms([
+        BinaryPolynomialTerm(c=1.0, p=[]),
+        BinaryPolynomialTerm(c=1.0, p=[0]),
+        BinaryPolynomialTerm(c=1.0, p=[1]),
+    ])
+    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
+    assert actual_terms == expected_terms
+
+
+def test_relax_constraint():
+    x = [DecisionVariable.binary(i, name="x", subscripts=[i]) for i in range(3)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[0] + x[1],
+        constraints=[(x[0] + 2 * x[1] <= 1).set_id(0), (x[1] + x[2] <= 1).set_id(1)],
+        sense=Instance.MINIMIZE,
+    )
+
+    assert instance.used_decision_variables == x
+    instance.relax_constraint(1, "relax")
+    # id for x[2] is listed as irrelevant
+    assert instance.decision_variable_analysis().irrelevant() == {x[2].id}
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+    
+    # After relaxing constraint 1, x[2] should not appear in binary_polynomial
+    # since it's only used in the relaxed constraint
+    assert qubo_request.binary_polynomial is not None
+    
+    # Expected terms: x[0] + x[1] (objective only, constraint relaxed)
+    expected_terms = sort_terms([
+        BinaryPolynomialTerm(c=1.0, p=[0]),
+        BinaryPolynomialTerm(c=1.0, p=[1]),
+    ])
+    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
+    assert actual_terms == expected_terms
+
