@@ -1010,7 +1010,7 @@ def validate_qubo_request(qubo_request, expected_terms, expected_inequality_term
     expected_terms_sorted = sort_terms(expected_terms)
     actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
     assert actual_terms == expected_terms_sorted
-    
+
     assert qubo_request.inequalities is not None
     expected_inequality_terms_sorted = sort_terms(expected_inequality_terms)
     actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
