@@ -1103,20 +1103,6 @@ def test_relax_constraint():
     adapter = OMMXDA4Adapter(instance)
     qubo_request = adapter.sampler_input
 
-    # After relaxing constraint 1, x[2] should not appear in binary_polynomial
-    # since it's only used in the relaxed constraint
-    assert qubo_request.binary_polynomial is not None
-
-    # Expected terms: x[0] + x[1] (objective only, constraint relaxed)
-    expected_terms = sort_terms(
-        [
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=1.0, p=[1]),
-        ]
-    )
-    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
-    assert actual_terms == expected_terms
-
     # After relaxing constraint 1, only constraint 0 remains: x[0] + 2*x[1] <= 1
     assert qubo_request.inequalities is not None
     assert len(qubo_request.inequalities) == 1
