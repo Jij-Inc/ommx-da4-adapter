@@ -1004,6 +1004,19 @@ def test_decode_to_sample(instance_knapsack_problem):
     assert len(solution.decision_variables) == 6
 
 
+def validate_qubo_request(qubo_request, expected_terms, expected_inequality_terms):
+    """Helper function to validate QUBO request with expected binary polynomial and inequality terms."""
+    assert qubo_request.binary_polynomial is not None
+    expected_terms_sorted = sort_terms(expected_terms)
+    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
+    assert actual_terms == expected_terms_sorted
+    
+    assert qubo_request.inequalities is not None
+    expected_inequality_terms_sorted = sort_terms(expected_inequality_terms)
+    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
+    assert actual_inequality_terms == expected_inequality_terms_sorted
+
+
 def test_partial_evaluate():
     x = [DecisionVariable.binary(i, name="x", subscripts=[i]) for i in range(3)]
     instance = Instance.from_components(
@@ -1021,26 +1034,18 @@ def test_partial_evaluate():
     adapter = OMMXDA4Adapter(partial)
     qubo_request = adapter.sampler_input
 
-    assert qubo_request.binary_polynomial is not None
-    expected_terms = sort_terms(
-        [
+    validate_qubo_request(
+        qubo_request,
+        expected_terms=[
             BinaryPolynomialTerm(c=1.0, p=[]),
             BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[1]),
-        ]
-    )
-    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
-    assert actual_terms == expected_terms
-
-    assert qubo_request.inequalities is not None
-    expected_inequality_terms = sort_terms(
-        [
+        ],
+        expected_inequality_terms=[
             BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[1]),
-        ]
+        ],
     )
-    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
-    assert actual_inequality_terms == expected_inequality_terms
 
     partial = instance.partial_evaluate({1: 1})
     assert partial.used_decision_variables == [x[0], x[2]]
@@ -1048,26 +1053,18 @@ def test_partial_evaluate():
     adapter = OMMXDA4Adapter(partial)
     qubo_request = adapter.sampler_input
 
-    assert qubo_request.binary_polynomial is not None
-    expected_terms = sort_terms(
-        [
+    validate_qubo_request(
+        qubo_request,
+        expected_terms=[
             BinaryPolynomialTerm(c=1.0, p=[]),
             BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[1]),
-        ]
-    )
-    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
-    assert actual_terms == expected_terms
-
-    assert qubo_request.inequalities is not None
-    expected_inequality_terms = sort_terms(
-        [
+        ],
+        expected_inequality_terms=[
             BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[1]),
-        ]
+        ],
     )
-    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
-    assert actual_inequality_terms == expected_inequality_terms
 
     partial = instance.partial_evaluate({2: 1})
     assert partial.used_decision_variables == x[0:2]
@@ -1075,26 +1072,18 @@ def test_partial_evaluate():
     adapter = OMMXDA4Adapter(partial)
     qubo_request = adapter.sampler_input
 
-    assert qubo_request.binary_polynomial is not None
-    expected_terms = sort_terms(
-        [
+    validate_qubo_request(
+        qubo_request,
+        expected_terms=[
             BinaryPolynomialTerm(c=1.0, p=[]),
             BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[1]),
-        ]
-    )
-    actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
-    assert actual_terms == expected_terms
-
-    assert qubo_request.inequalities is not None
-    expected_inequality_terms = sort_terms(
-        [
+        ],
+        expected_inequality_terms=[
             BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[1]),
-        ]
+        ],
     )
-    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
-    assert actual_inequality_terms == expected_inequality_terms
 
 
 def test_relax_constraint():
