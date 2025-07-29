@@ -1003,6 +1003,7 @@ def test_decode_to_sample(instance_knapsack_problem):
     assert solution is not None
     assert len(solution.decision_variables) == 6
 
+
 def test_partial_evaluate():
     x = [DecisionVariable.binary(i, name="x", subscripts=[i]) for i in range(3)]
     instance = Instance.from_components(
@@ -1016,49 +1017,84 @@ def test_partial_evaluate():
     partial = instance.partial_evaluate({0: 1})
     # x[0] is no longer present in the problem
     assert partial.used_decision_variables == x[1:]
-    
+
     adapter = OMMXDA4Adapter(partial)
     qubo_request = adapter.sampler_input
-    
+
     assert qubo_request.binary_polynomial is not None
-    expected_terms = sort_terms([
-        BinaryPolynomialTerm(c=1.0, p=[]),
-        BinaryPolynomialTerm(c=1.0, p=[0]),
-        BinaryPolynomialTerm(c=1.0, p=[1]),
-    ])
+    expected_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
     actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
     assert actual_terms == expected_terms
+
+    assert qubo_request.inequalities is not None
+    expected_inequality_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
+    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
+    assert actual_inequality_terms == expected_inequality_terms
 
     partial = instance.partial_evaluate({1: 1})
     assert partial.used_decision_variables == [x[0], x[2]]
-    
+
     adapter = OMMXDA4Adapter(partial)
     qubo_request = adapter.sampler_input
-    
+
     assert qubo_request.binary_polynomial is not None
-    expected_terms = sort_terms([
-        BinaryPolynomialTerm(c=1.0, p=[]),
-        BinaryPolynomialTerm(c=1.0, p=[0]),
-        BinaryPolynomialTerm(c=1.0, p=[1]),
-    ])
+    expected_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
     actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
     assert actual_terms == expected_terms
+
+    assert qubo_request.inequalities is not None
+    expected_inequality_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
+    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
+    assert actual_inequality_terms == expected_inequality_terms
 
     partial = instance.partial_evaluate({2: 1})
     assert partial.used_decision_variables == x[0:2]
-    
+
     adapter = OMMXDA4Adapter(partial)
     qubo_request = adapter.sampler_input
-    
 
     assert qubo_request.binary_polynomial is not None
-    expected_terms = sort_terms([
-        BinaryPolynomialTerm(c=1.0, p=[]),
-        BinaryPolynomialTerm(c=1.0, p=[0]),
-        BinaryPolynomialTerm(c=1.0, p=[1]),
-    ])
+    expected_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
     actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
     assert actual_terms == expected_terms
+
+    assert qubo_request.inequalities is not None
+    expected_inequality_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
+    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
+    assert actual_inequality_terms == expected_inequality_terms
 
 
 def test_relax_constraint():
@@ -1077,16 +1113,30 @@ def test_relax_constraint():
 
     adapter = OMMXDA4Adapter(instance)
     qubo_request = adapter.sampler_input
-    
+
     # After relaxing constraint 1, x[2] should not appear in binary_polynomial
     # since it's only used in the relaxed constraint
     assert qubo_request.binary_polynomial is not None
-    
+
     # Expected terms: x[0] + x[1] (objective only, constraint relaxed)
-    expected_terms = sort_terms([
-        BinaryPolynomialTerm(c=1.0, p=[0]),
-        BinaryPolynomialTerm(c=1.0, p=[1]),
-    ])
+    expected_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
     actual_terms = sort_terms(qubo_request.binary_polynomial.terms)
     assert actual_terms == expected_terms
 
+    # After relaxing constraint 1, only constraint 0 remains: x[0] + 2*x[1] <= 1
+    assert qubo_request.inequalities is not None
+    assert len(qubo_request.inequalities) == 1
+    expected_inequality_terms = sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=2.0, p=[1]),
+            BinaryPolynomialTerm(c=-1.0, p=[]),
+        ]
+    )
+    actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
+    assert actual_inequality_terms == expected_inequality_terms
