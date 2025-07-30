@@ -209,7 +209,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         """Check if the decision variables are binary."""
         instance = self._ommx_instance
 
-        for decision_variable in instance.decision_variables:
+        for decision_variable in instance.used_decision_variables:
             if decision_variable.kind != DecisionVariable.BINARY:
                 raise OMMXDA4AdapterError(
                     f"The decision variable must be binary: id {decision_variable.id}"
@@ -359,7 +359,7 @@ class OMMXDA4Adapter(SamplerAdapter):
             for variable in variables:
                 variable_map[variable] = index
                 index += 1
-        for decision_variable in instance.decision_variables:
+        for decision_variable in instance.used_decision_variables:
             # skip if already in variable_map
             if decision_variable.id in variable_map:
                 continue
