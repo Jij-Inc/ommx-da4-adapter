@@ -1021,8 +1021,8 @@ def test_partial_evaluate():
     x = [DecisionVariable.binary(i, name="x", subscripts=[i]) for i in range(3)]
     instance = Instance.from_components(
         decision_variables=x,
-        objective=x[0] + x[1] + x[2],
-        constraints=[(x[0] + x[1] + x[2] <= 1).set_id(0)],
+        objective=1 * x[0] + 2 * x[1] + 3 * x[2],
+        constraints=[(1 * x[0] + 2 * x[1] + 3 * x[2] <= 2).set_id(0)],
         sense=Instance.MINIMIZE,
     )
     assert instance.used_decision_variables == x
@@ -1037,13 +1037,16 @@ def test_partial_evaluate():
     validate_qubo_request(
         qubo_request,
         expected_terms=[
-            BinaryPolynomialTerm(c=1.0, p=[]),
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=1.0, p=[1]),
+            BinaryPolynomialTerm(c=1.0, p=[]),  # constant term from x[0]=1 -> 1*1 = 1
+            BinaryPolynomialTerm(c=2.0, p=[0]),  # x[1] coefficient
+            BinaryPolynomialTerm(c=3.0, p=[1]),  # x[2] coefficient
         ],
         expected_inequality_terms=[
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=1.0, p=[1]),
+            BinaryPolynomialTerm(
+                c=-1.0, p=[]
+            ),  # constant term: 2*x[1] + 3*x[2] - 1 <= 0
+            BinaryPolynomialTerm(c=2.0, p=[0]),  # x[1] coefficient in constraint
+            BinaryPolynomialTerm(c=3.0, p=[1]),  # x[2] coefficient in constraint
         ],
     )
 
@@ -1056,13 +1059,15 @@ def test_partial_evaluate():
     validate_qubo_request(
         qubo_request,
         expected_terms=[
-            BinaryPolynomialTerm(c=1.0, p=[]),
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=1.0, p=[1]),
+            BinaryPolynomialTerm(c=2.0, p=[]),  # constant term from x[1]=1 -> 2*1 = 2
+            BinaryPolynomialTerm(c=1.0, p=[0]),  # x[0] coefficient
+            BinaryPolynomialTerm(c=3.0, p=[1]),  # x[2] coefficient
         ],
         expected_inequality_terms=[
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=1.0, p=[1]),
+            BinaryPolynomialTerm(
+                c=1.0, p=[0]
+            ),  # x[0] coefficient in constraint: 1*x[0] + 3*x[2] <= 0
+            BinaryPolynomialTerm(c=3.0, p=[1]),  # x[2] coefficient in constraint
         ],
     )
 
@@ -1075,13 +1080,16 @@ def test_partial_evaluate():
     validate_qubo_request(
         qubo_request,
         expected_terms=[
-            BinaryPolynomialTerm(c=1.0, p=[]),
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=1.0, p=[1]),
+            BinaryPolynomialTerm(c=3.0, p=[]),  # constant term from x[2]=1 -> 3*1 = 3
+            BinaryPolynomialTerm(c=1.0, p=[0]),  # x[0] coefficient
+            BinaryPolynomialTerm(c=2.0, p=[1]),  # x[1] coefficient
         ],
         expected_inequality_terms=[
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=1.0, p=[1]),
+            BinaryPolynomialTerm(
+                c=1.0, p=[]
+            ),  # constant term: 1*x[0] + 2*x[1] + 1 <= 0
+            BinaryPolynomialTerm(c=1.0, p=[0]),  # x[0] coefficient in constraint
+            BinaryPolynomialTerm(c=2.0, p=[1]),  # x[1] coefficient in constraint
         ],
     )
 
