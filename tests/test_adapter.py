@@ -1034,6 +1034,8 @@ def test_partial_evaluate():
     adapter = OMMXDA4Adapter(partial)
     qubo_request = adapter.sampler_input
 
+    # Note: Variable IDs are remapped due to variable_map generation in the adapter.
+    # After fixing x[0], remaining variables x[1] and x[2] get mapped to indices [0] and [1] respectively.
     validate_qubo_request(
         qubo_request,
         expected_terms=[
