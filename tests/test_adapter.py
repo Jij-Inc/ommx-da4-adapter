@@ -1,6 +1,6 @@
 import pytest
 
-from ommx.v1 import Constraint, DecisionVariable, Instance, ConstraintHints, OneHot
+from ommx import Constraint, DecisionVariable, Instance, ConstraintHints, OneHot
 
 from ommx_da4_adapter import OMMXDA4Adapter
 from ommx_da4_adapter.exception import OMMXDA4AdapterError

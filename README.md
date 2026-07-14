@@ -12,7 +12,7 @@ pip install ommx-da4-adapter
 Here's a simple example of how to use the adapter directly:
 
 ```python
-from ommx.v1 import Instance, DecisionVariable
+from ommx import Instance, DecisionVariable
 from ommx_da4_adapter import OMMXDA4Adapter
 
 x_0 = DecisionVariable.binary(id=0, name="x_0")
