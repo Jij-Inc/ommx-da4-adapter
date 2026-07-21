@@ -1,6 +1,6 @@
 from typing import Literal, Optional, Union
 
-from ommx.adapter import SamplerAdapter
+from ommx.adapter import SamplerAdapter, DiagnosticsSink
 from ommx import (
     Instance,
     SampleSet,
@@ -9,6 +9,7 @@ from ommx import (
     Solution,
     State,
     Samples,
+    AdditionalCapability,
 )
 
 from .client import DA4Client
@@ -25,6 +26,8 @@ from .models import (
 
 
 class OMMXDA4Adapter(SamplerAdapter):
+    ADDITIONAL_CAPABILITIES = frozenset({AdditionalCapability.OneHot})
+
     def __init__(
         self,
         ommx_instance: Instance,
@@ -66,6 +69,8 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param fixed_config: Fixed value for each variable
         :param inequalities_lambda: Coefficient of inequality. If omitted, set to 1. Defaults to None.
         """
+        super().__init__(ommx_instance)
+
         self._ommx_instance = ommx_instance
         self._inequalities_lambda = inequalities_lambda
 
@@ -123,6 +128,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         token: Optional[str] = None,
         url: str = "https://api.aispf.global.fujitsu.com/da",
         version: Literal["v4", "v3c"] = "v4",
+        diagnostics: DiagnosticsSink | None = None,
     ) -> SampleSet:
         """Sample the result in DA4 with DA4Client.
 
@@ -152,6 +158,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         token: Optional[str] = None,
         url: str = "https://api.aispf.global.fujitsu.com/da",
         version: Literal["v4", "v3c"] = "v4",
+        diagnostics: DiagnosticsSink | None = None,
     ) -> Solution:
         """Solve the result in DA4 with DA4Client.
 
