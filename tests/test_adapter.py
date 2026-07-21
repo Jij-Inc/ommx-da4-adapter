@@ -1,6 +1,6 @@
 import pytest
 
-from ommx import Constraint, DecisionVariable, Instance, ConstraintHints, OneHot
+from ommx import Constraint, DecisionVariable, Instance, OneHotConstraint
 
 from ommx_da4_adapter import OMMXDA4Adapter
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
@@ -19,12 +19,12 @@ def instance_for_validation():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    constraints = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
+        constraints={0: constraints},
         sense=Instance.MINIMIZE,
     )
 
@@ -157,12 +157,12 @@ def instance_for_integer_variable():
     x_2 = DecisionVariable.integer(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    constraints = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
+        constraints={0: constraints},
         sense=Instance.MAXIMIZE,
     )
 
@@ -183,12 +183,12 @@ def instance_for_continuous_variable():
     x_2 = DecisionVariable.continuous(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    constraints = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
+        constraints={0: constraints},
         sense=Instance.MAXIMIZE,
     )
 
@@ -223,18 +223,16 @@ def instance():
 
     assert isinstance(constraint_inequality_1, Constraint)
     assert isinstance(constraint_inequality_2, Constraint)
-    constraint_inequality_1.set_id(2)
-    constraint_inequality_2.set_id(3)
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2, x_3],
         objective=objective,
-        constraints=[
-            constraint_equality_1,
-            constraint_equality_2,
-            constraint_inequality_1,
-            constraint_inequality_2,
-        ],
+        constraints={
+            0: constraint_equality_1,
+            1: constraint_equality_2,
+            2: constraint_inequality_1,
+            3: constraint_inequality_2,
+        },
         sense=Instance.MINIMIZE,
     )
 
@@ -407,12 +405,12 @@ def instance_for_MAXIMIZE():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    constraints = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
+        constraints={0: constraints},
         sense=Instance.MAXIMIZE,
     )
 
@@ -441,12 +439,12 @@ def instance_for_no_penalty_binary_polynomial():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 <= 0]
+    constraints = x_1 * x_2 <= 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
+        constraints={0: constraints},
         sense=Instance.MINIMIZE,
     )
 
@@ -466,12 +464,12 @@ def instance_for_no_inequalities():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    constraints = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
+        constraints={0: constraints},
         sense=Instance.MINIMIZE,
     )
 
@@ -492,16 +490,15 @@ def instance_with_a_one_hot_constraint():
     constraint = x[1] + x[2] + x[3] == 1
 
     assert isinstance(constraint, Constraint)
-    constraint.set_id(0)
 
-    hints = ConstraintHints(one_hot_constraints=[OneHot(id=0, variables=[1, 2, 3])])
+    onehot = OneHotConstraint(variables=[1, 2, 3])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint],
+        constraints={0: constraint},
+        one_hot_constraints={0: onehot},
         sense=Instance.MAXIMIZE,
-        constraint_hints=hints,
     )
 
     return ommx_instance
@@ -560,30 +557,23 @@ def instance_with_various_constraints():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(10)]
 
     objective = sum(x[i] for i in range(10))
-    constraint_1 = sum(x[i] for i in range(3)) == 1
-    constraint_2 = sum(x[i] for i in range(3, 8)) == 1
-    constraint_3 = sum(x[i] for i in range(8, 10)) <= 1
+    constraint_0 = sum(x[i] for i in range(3)) == 1
+    constraint_1 = sum(x[i] for i in range(3, 8)) == 1
+    constraint_2 = sum(x[i] for i in range(8, 10)) <= 1
 
+    assert isinstance(constraint_0, Constraint)
     assert isinstance(constraint_1, Constraint)
     assert isinstance(constraint_2, Constraint)
-    assert isinstance(constraint_3, Constraint)
-    constraint_1.set_id(0)
-    constraint_2.set_id(1)
-    constraint_3.set_id(2)
 
-    hints = ConstraintHints(
-        one_hot_constraints=[
-            OneHot(id=0, variables=[0, 1, 2]),
-            OneHot(id=1, variables=[3, 4, 5, 6, 7]),
-        ]
-    )
+    onehot_0 = OneHotConstraint(variables=[0, 1, 2])
+    onehot_1 = OneHotConstraint(variables=[3, 4, 5, 6, 7])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint_1, constraint_2, constraint_3],
+        constraints={0: constraint_0, 1: constraint_1, 2: constraint_2},
         sense=Instance.MAXIMIZE,
-        constraint_hints=hints,
+        one_hot_constraints={0: onehot_0, 1: onehot_1},
     )
 
     return ommx_instance
@@ -629,11 +619,11 @@ def test_one_way_one_hot_groups_with_various_constraints(
 def instance_with_no_one_hot_constraint():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    constraint = [x[1] + x[2] + x[3] == 2]
+    constraint = x[1] + x[2] + x[3] == 2
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=constraint,
+        constraints={0: constraint},
         sense=Instance.MAXIMIZE,
     )
 
@@ -670,27 +660,21 @@ def test_one_way_one_hot_groups_with_no_one_hot_constraint(
 def instance_with_duplicates():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    constraint_1 = sum(x[i] for i in range(2)) == 1
-    constraint_2 = sum(x[i] for i in range(1, 4)) == 1
+    constraint_0 = sum(x[i] for i in range(2)) == 1
+    constraint_1 = sum(x[i] for i in range(1, 4)) == 1
 
+    assert isinstance(constraint_0, Constraint)
     assert isinstance(constraint_1, Constraint)
-    assert isinstance(constraint_2, Constraint)
-    constraint_1.set_id(0)
-    constraint_2.set_id(1)
 
-    hints = ConstraintHints(
-        one_hot_constraints=[
-            OneHot(id=0, variables=[0, 1]),
-            OneHot(id=1, variables=[1, 2, 3]),
-        ]
-    )
+    onehot_0 = OneHotConstraint(variables=[0, 1])
+    onehot_1 = OneHotConstraint(variables=[1, 2, 3])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint_1, constraint_2],
+        constraints={0: constraint_0, 1: constraint_1},
+        one_hot_constraints={0: onehot_0, 1: onehot_1},
         sense=Instance.MAXIMIZE,
-        constraint_hints=hints,
     )
 
     return ommx_instance
@@ -768,7 +752,7 @@ def instance_knapsack_problem():
     instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint],
+        constraints={0: constraint},
         sense=Instance.MAXIMIZE,
     )
 
@@ -866,10 +850,10 @@ def test_decode_to_sampleset(instance_knapsack_problem):
 
     assert sampleset is not None
     assert len(sampleset.decision_variables) == 6
-    assert len(sampleset.sample_ids) == 5
+    assert len(sampleset.sample_ids_list) == 5
 
 
-def test_sampele_without_token(instance_knapsack_problem):
+def test_sample_without_token(instance_knapsack_problem):
     with pytest.raises(
         OMMXDA4AdapterError,
         match="token is required. Please set the token to use the DA4 API.",
@@ -1022,7 +1006,7 @@ def test_partial_evaluate():
     instance = Instance.from_components(
         decision_variables=x,
         objective=1 * x[0] + 2 * x[1] + 3 * x[2],
-        constraints=[(1 * x[0] + 2 * x[1] + 3 * x[2] <= 2).set_id(0)],
+        constraints={0: (1 * x[0] + 2 * x[1] + 3 * x[2] <= 2)},
         sense=Instance.MINIMIZE,
     )
     assert instance.used_decision_variables == x
@@ -1101,14 +1085,14 @@ def test_relax_constraint():
     instance = Instance.from_components(
         decision_variables=x,
         objective=x[0] + x[1],
-        constraints=[(x[0] + 2 * x[1] <= 1).set_id(0), (x[1] + x[2] <= 1).set_id(1)],
+        constraints={0: (x[0] + 2 * x[1] <= 1), 1: (x[1] + x[2] <= 1)},
         sense=Instance.MINIMIZE,
     )
 
     assert instance.used_decision_variables == x
     instance.relax_constraint(1, "relax")
     # id for x[2] is listed as irrelevant
-    assert instance.decision_variable_analysis().irrelevant() == {x[2].id}
+    assert instance.irrelevant_decision_variable_ids() == {x[2].id}
 
     adapter = OMMXDA4Adapter(instance)
     qubo_request = adapter.sampler_input

@@ -258,12 +258,12 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         # Squared Polynomial with Binary Variables
         squared_terms_dict = {}
-        for constraint in instance.constraints:
+        for constraint_id, constraint in instance.constraints.items():
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
 
-            if constraint.id in self._one_hot_dict:
+            if constraint_id in self._one_hot_dict:
                 continue
 
             function = constraint.function
@@ -300,7 +300,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         inequalities_list = []
-        for constraint in instance.constraints:
+        for constraint_id, constraint in instance.constraints.items():
             # skip if not inequality constraints
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 continue
@@ -315,11 +315,11 @@ class OMMXDA4Adapter(SamplerAdapter):
 
             if (
                 self._inequalities_lambda is None
-                or constraint.id not in self._inequalities_lambda
+                or constraint_id not in self._inequalities_lambda
             ):
                 lambda_ = 1
             else:
-                lambda_ = self._inequalities_lambda[constraint.id]
+                lambda_ = self._inequalities_lambda[constraint_id]
             inequalities_list.append(
                 Inequalities(terms=inequalities_terms, **{"lambda": lambda_})
             )
@@ -339,7 +339,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         instance = self._ommx_instance
 
-        if len(instance.constraint_hints.one_hot_constraints) == 0:
+        if len(instance.one_hot_constraints) == 0:
             return 0
         else:
             return 1
@@ -419,14 +419,14 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         sorted_one_hot_constraints = sorted(
-            instance.constraint_hints.one_hot_constraints,
-            key=lambda x: len(x.variables),
+            instance.one_hot_constraints.items(),
+            key=lambda item: len(item[1].variables),
             reverse=True,
         )
 
         one_hot_dict: dict[int, list[int]] = {}
         used_variables = set()
-        for one_hot_constraint in sorted_one_hot_constraints:
+        for constraint_id, one_hot_constraint in sorted_one_hot_constraints:
             if any(
                 [
                     variable in used_variables
@@ -436,7 +436,7 @@ class OMMXDA4Adapter(SamplerAdapter):
                 continue
 
             used_variables.update(one_hot_constraint.variables)
-            one_hot_dict[one_hot_constraint.id] = [
+            one_hot_dict[constraint_id] = [
                 variable_id for variable_id in one_hot_constraint.variables
             ]
 

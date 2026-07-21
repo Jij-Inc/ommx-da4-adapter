@@ -21,7 +21,7 @@ x_1 = DecisionVariable.binary(id=1, name="x_1")
 ommx_instance = Instance.from_components(
     decision_variables=[x_0, x_1],
     objective=x_0 * x_1 + x_0 - x_1 + 1,
-    constraints=[x_0 + x_1 == 1],
+    constraints={0: x_0 + x_1 == 1},
     sense=Instance.MINIMIZE,
 )
 
