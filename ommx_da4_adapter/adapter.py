@@ -265,12 +265,9 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         # Squared Polynomial with Binary Variables
         squared_terms_dict = {}
-        for constraint_id, constraint in instance.constraints.items():
+        for constraint in instance.constraints.values():
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
-                continue
-
-            if constraint_id in self._one_hot_dict:
                 continue
 
             function = constraint.function
@@ -432,19 +429,16 @@ class OMMXDA4Adapter(SamplerAdapter):
         )
 
         one_hot_dict: dict[int, list[int]] = {}
-        used_variables = set()
+        used_variables: set[int] = set()
         for constraint_id, one_hot_constraint in sorted_one_hot_constraints:
-            if any(
-                [
-                    variable in used_variables
-                    for variable in one_hot_constraint.variables
-                ]
-            ):
+            variables = list(one_hot_constraint.variables)
+
+            if used_variables.intersection(variables):
+                # The converted regular constraint is assigned a new ID automatically.
+                instance.convert_one_hot_to_constraint(constraint_id)
                 continue
 
-            used_variables.update(one_hot_constraint.variables)
-            one_hot_dict[constraint_id] = [
-                variable_id for variable_id in one_hot_constraint.variables
-            ]
+            used_variables.update(variables)
+            one_hot_dict[constraint_id] = variables
 
         return one_hot_dict
