@@ -17,7 +17,7 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "ommx>=3.0.0a8,<4.0.0",
+    "ommx>=3.0.0b3,<4.0.0",
     "requests>=2.25.0,<3.0.0",
     "pydantic>=2.10.0,<3.0.0",
 ]
@@ -38,3 +38,7 @@ packages = ["ommx_da4_adapter"]
 
 [tool.setuptools_scm]
 version_file = "./ommx_da4_adapter/_version.py"
+
+# Temporary workaround until OMMX 3.0.0b3 is published on PyPI; remove this section afterward.
+[tool.uv.sources]
+ommx = { path = "../../ommx/python/ommx" }
