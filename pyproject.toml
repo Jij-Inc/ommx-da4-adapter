@@ -38,7 +38,3 @@ packages = ["ommx_da4_adapter"]
 
 [tool.setuptools_scm]
 version_file = "./ommx_da4_adapter/_version.py"
-
-# Temporary workaround until OMMX 3.0.0b3 is published on PyPI; remove this section afterward.
-[tool.uv.sources]
-ommx = { path = "../../ommx/python/ommx" }
