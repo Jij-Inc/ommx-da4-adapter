@@ -1,23 +1,23 @@
-from typing import ClassVar, Literal, Optional, Union
+from typing import ClassVar, Literal
 
-from ommx.adapter import SamplerAdapter, DiagnosticsSink
 from ommx import (
-    Instance,
-    SampleSet,
     Constraint,
     DegreeBound,
     Equality,
-    Solution,
-    State,
-    Samples,
+    Instance,
     InstanceClass,
     InstanceClassClause,
     Kind,
     PreparationPolicy,
+    Samples,
+    SampleSet,
     Sense,
+    Solution,
     SpecialConstraintKind,
     SpecialConstraintPreparation,
+    State,
 )
+from ommx.adapter import DiagnosticsSink, SamplerAdapter
 
 from .client import DA4Client
 from .exception import OMMXDA4AdapterError
@@ -76,7 +76,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         ommx_instance: Instance,
         *,
         time_limit_sec: int = 10,
-        target_energy: Optional[float] = None,
+        target_energy: float | None = None,
         num_run: int = 16,
         num_group: int = 1,
         num_output_solution: int = 5,
@@ -88,9 +88,9 @@ class OMMXDA4Adapter(SamplerAdapter):
         penalty_coef: int = 1,
         penalty_inc_rate: int = 150,
         max_penalty_coef: int = 0,
-        guidance_config: Optional[dict[str, bool]] = None,
-        fixed_config: Optional[dict[str, bool]] = None,
-        inequalities_lambda: Optional[dict[int, int]] = None,
+        guidance_config: dict[str, bool] | None = None,
+        fixed_config: dict[str, bool] | None = None,
+        inequalities_lambda: dict[int, int] | None = None,
     ):
         """Digital Annealer adapter for OMMX.
 
@@ -170,7 +170,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         cls,
         ommx_instance: Instance,
         *,
-        token: Optional[str] = None,
+        token: str | None = None,
         url: str = "https://api.aispf.global.fujitsu.com/da",
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
@@ -201,7 +201,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         cls,
         ommx_instance: Instance,
         *,
-        token: Optional[str] = None,
+        token: str | None = None,
         url: str = "https://api.aispf.global.fujitsu.com/da",
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
@@ -291,7 +291,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
     def _generate_penalty_binary_polynomial(
         self,
-    ) -> Union[PenaltyBinaryPolynomial, None]:
+    ) -> PenaltyBinaryPolynomial | None:
         """Generate PenaltyBinaryPolynomial from OMMX instance.
 
         Example:
@@ -350,7 +350,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         else:
             return PenaltyBinaryPolynomial(terms=penalty_binary_polynomial_terms)
 
-    def _generate_inequalities(self) -> Union[list[Inequalities], None]:
+    def _generate_inequalities(self) -> list[Inequalities] | None:
         """Generate Inequalities from OMMX instance.
 
         :return: Inequalities
@@ -436,7 +436,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
     def _generate_one_way_one_hot_groups(
         self,
-    ) -> Union[dict[Literal["numbers"], list[int]], None]:
+    ) -> dict[Literal["numbers"], list[int]] | None:
         """Generate one way one hot groups."""
 
         numbers = [len(variables) for variables in self._one_hot_dict.values()]
