@@ -1,15 +1,22 @@
-from typing import Literal, Optional, Union
+from typing import ClassVar, Literal, Optional, Union
 
 from ommx.adapter import SamplerAdapter, DiagnosticsSink
 from ommx import (
     Instance,
     SampleSet,
     Constraint,
-    DecisionVariable,
+    DegreeBound,
+    Equality,
     Solution,
     State,
     Samples,
-    AdditionalCapability,
+    InstanceClass,
+    InstanceClassClause,
+    Kind,
+    PreparationPolicy,
+    Sense,
+    SpecialConstraintKind,
+    SpecialConstraintPreparation,
 )
 
 from .client import DA4Client
@@ -24,9 +31,45 @@ from .models import (
     QuboResponse,
 )
 
+_UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS = {
+    Equality.EqualToZero: DegreeBound.unbounded(),
+    Equality.LessThanOrEqualToZero: DegreeBound.unbounded(),
+}
+
 
 class OMMXDA4Adapter(SamplerAdapter):
-    ADDITIONAL_CAPABILITIES = frozenset({AdditionalCapability.OneHot})
+    INPUT_CLASS: ClassVar[InstanceClass | None] = InstanceClass(
+        [
+            InstanceClassClause(
+                label="da4-binary-polynomial-with-one-hot",
+                allowed_variable_kinds={Kind.Binary},
+                objective_degree_bound=DegreeBound.unbounded(),
+                regular_constraint_degree_bounds=(
+                    _UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS
+                ),
+                allows_one_hot=True,
+                allowed_senses={Sense.Minimize, Sense.Maximize},
+            )
+        ]
+    )
+
+    @classmethod
+    def recommended_preparation_policy(cls) -> PreparationPolicy:
+        """Recommend lowering unsupported special constraints before using DA4.
+
+        DA4 accepts OneHot constraints directly through one-way one-hot groups.
+        This recommendation therefore preserves OneHot constraints and lowers
+        only Indicator and SOS1 constraints. The returned policy is fresh and
+        caller-editable.
+        """
+        return PreparationPolicy(
+            special_constraints=SpecialConstraintPreparation.lower_special_constraints(
+                kinds={
+                    SpecialConstraintKind.Indicator,
+                    SpecialConstraintKind.Sos1,
+                }
+            )
+        )
 
     def __init__(
         self,
@@ -69,13 +112,15 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param fixed_config: Fixed value for each variable
         :param inequalities_lambda: Coefficient of inequality. If omitted, set to 1. Defaults to None.
         """
-        super().__init__(ommx_instance)
+        self.require_applicable(ommx_instance)
 
         self._ommx_instance = ommx_instance
         self._inequalities_lambda = inequalities_lambda
 
-        self._check_decision_variable()
-        self._one_hot_dict = self._generate_one_hot_dict()
+        (
+            self._one_hot_dict,
+            self._penalty_one_hot_dict,
+        ) = self._partition_one_hot_constraints()
         self._variable_map = self._generate_variable_map()
 
         # generate QuboRequest from OMMX instance
@@ -143,6 +188,7 @@ class OMMXDA4Adapter(SamplerAdapter):
                 "token is required. Please set the token to use the DA4 API."
             )
 
+        _ = diagnostics
         adapter = cls(ommx_instance)
         qubo_request = adapter.sampler_input
         client = DA4Client(token=token, url=url, version=version)
@@ -168,7 +214,13 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
         :return: Solution
         """
-        sample_set = cls.sample(ommx_instance, token=token, url=url, version=version)
+        sample_set = cls.sample(
+            ommx_instance,
+            token=token,
+            url=url,
+            version=version,
+            diagnostics=diagnostics,
+        )
         return sample_set.best_feasible
 
     def decode_to_sampleset(self, data: QuboResponse) -> SampleSet:
@@ -212,16 +264,6 @@ class OMMXDA4Adapter(SamplerAdapter):
         sample_set = self.decode_to_sampleset(data)
         return sample_set.best_feasible
 
-    def _check_decision_variable(self):
-        """Check if the decision variables are binary."""
-        instance = self._ommx_instance
-
-        for decision_variable in instance.used_decision_variables:
-            if decision_variable.kind != DecisionVariable.BINARY:
-                raise OMMXDA4AdapterError(
-                    f"The decision variable must be binary: id {decision_variable.id}"
-                )
-
     def _generate_binary_polynomial(self) -> BinaryPolynomial:
         """Generate BinaryPolynomial from OMMX instance."
 
@@ -264,7 +306,15 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         # Squared Polynomial with Binary Variables
-        squared_terms_dict = {}
+        squared_terms_dict: dict[tuple[int, ...], float] = {}
+
+        def add_term(key: tuple[int, ...], value: float) -> None:
+            # Binary variables satisfy x^n = x for every positive integer n.
+            binary_key = tuple(sorted(set(key)))
+            squared_terms_dict[binary_key] = (
+                squared_terms_dict.get(binary_key, 0.0) + value
+            )
+
         for constraint in instance.constraints.values():
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
@@ -274,15 +324,19 @@ class OMMXDA4Adapter(SamplerAdapter):
             squared_function = function * function
 
             for key, value in squared_function.terms.items():
-                # Remove duplicates by converting to set
-                set_key = set(key)
-                list_key = tuple(set_key)
+                add_term(key, value)
 
-                # Add to existing value when duplicates occur
-                if list_key in squared_terms_dict:
-                    squared_terms_dict[list_key] += value
-                else:
-                    squared_terms_dict[list_key] = value
+        # DA4 one-way one-hot groups cannot share decision variables. Treat each
+        # overlapping group that was not selected for native handling as the
+        # regular equality sum(x_i) - 1 = 0. For binary variables, its square is
+        # 2 * sum_{i < j}(x_i * x_j) - sum_i(x_i) + 1.
+        for variables in self._penalty_one_hot_dict.values():
+            add_term((), 1.0)
+            for variable in variables:
+                add_term((variable,), -1.0)
+            for index, left in enumerate(variables):
+                for right in variables[index + 1 :]:
+                    add_term((left, right), 2.0)
 
         penalty_binary_polynomial_terms = [
             BinaryPolynomialTerm(
@@ -341,12 +395,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         caution: two way one hot is not supported yet
         """
-        instance = self._ommx_instance
-
-        if len(instance.one_hot_constraints) == 0:
-            return 0
-        else:
-            return 1
+        return int(bool(self._one_hot_dict))
 
     def _generate_variable_map(self) -> dict[int, int]:
         """Generate variable map that represents the correspondence
@@ -397,8 +446,10 @@ class OMMXDA4Adapter(SamplerAdapter):
         else:
             return {"numbers": numbers}
 
-    def _generate_one_hot_dict(self) -> dict[int, list[int]]:
-        """Generate a dictionary of one-hot constraints without duplicate decision variables.
+    def _partition_one_hot_constraints(
+        self,
+    ) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
+        """Partition one-hot constraints for native and penalty handling.
 
         Examples:
         =========
@@ -407,18 +458,23 @@ class OMMXDA4Adapter(SamplerAdapter):
         constraint_2: id=1, x₃ + x₄ = 1
         constraint_3: id=2, x₅ + x₆ = 1
         one_hot_dict = {
-                            0: [0, 1, 2],
-                            1: [3, 4],
-                            2: [5, 6],
-                        }
+                           0: [0, 1, 2],
+                           1: [3, 4],
+                           2: [5, 6],
+                       }
+        penalty_one_hot_dict = {}
 
         case 2：duplicate decision variables
-        Prioritize longer constraints and exclude shorter ones
+        Prioritize longer constraints for native handling and send shorter ones
+        to penalty handling
         constraint_1: id=0, x₀ + x₁ + x₂ = 1
         constraint_2: id=1, x₁ + x₃ = 1
         one_hot_dict = {
-                            0: [0, 1, 2]
-                        }
+                           0: [0, 1, 2]
+                       }
+        penalty_one_hot_dict = {
+                                   1: [1, 3]
+                               }
         """
         instance = self._ommx_instance
 
@@ -429,16 +485,16 @@ class OMMXDA4Adapter(SamplerAdapter):
         )
 
         one_hot_dict: dict[int, list[int]] = {}
+        penalty_one_hot_dict: dict[int, list[int]] = {}
         used_variables: set[int] = set()
         for constraint_id, one_hot_constraint in sorted_one_hot_constraints:
             variables = list(one_hot_constraint.variables)
 
             if used_variables.intersection(variables):
-                # The converted regular constraint is assigned a new ID automatically.
-                instance.convert_one_hot_to_constraint(constraint_id)
+                penalty_one_hot_dict[constraint_id] = variables
                 continue
 
             used_variables.update(variables)
             one_hot_dict[constraint_id] = variables
 
-        return one_hot_dict
+        return one_hot_dict, penalty_one_hot_dict

@@ -1,6 +1,16 @@
 import pytest
 
-from ommx import Constraint, DecisionVariable, Instance, OneHotConstraint
+from ommx import (
+    Constraint,
+    DecisionVariable,
+    Instance,
+    InstanceClassMismatch,
+    Kind,
+    OneHotConstraint,
+    Sense,
+    Sos1Constraint,
+)
+from ommx.adapter import AdapterNotApplicableError
 
 from ommx_da4_adapter import OMMXDA4Adapter
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
@@ -11,6 +21,30 @@ from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse
 # Used to align the order (because the order may differ depending on the environment)
 def sort_terms(terms: list[BinaryPolynomialTerm]) -> list[BinaryPolynomialTerm]:
     return sorted(terms, key=lambda term: term.p)
+
+
+@pytest.mark.parametrize("sense", [Sense.Minimize, Sense.Maximize])
+def test_input_class_accepts_complete_binary_polynomial_boundary(sense):
+    x = [DecisionVariable.binary(i) for i in range(4)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[0] * x[1] * x[2] * x[3],
+        constraints={
+            0: x[0] * x[1] * x[2] == 0,
+            1: x[1] * x[2] <= 1,
+        },
+        one_hot_constraints={10: OneHotConstraint(variables=[x[0], x[3]])},
+        sense=sense,
+    )
+
+    report = OMMXDA4Adapter.check_applicability(instance)
+
+    assert report.is_applicable
+    assert report.input_membership.matching_clauses == [
+        (0, "da4-binary-polynomial-with-one-hot")
+    ]
+    assert report.preconditions_checked
+    assert report.precondition_violations == ()
 
 
 @pytest.fixture
@@ -151,56 +185,99 @@ def test_max_penalty_coef(instance_for_validation):
         OMMXDA4Adapter(instance_for_validation, max_penalty_coef=9223372036854775808)
 
 
-@pytest.fixture
-def instance_for_integer_variable():
-    x_1 = DecisionVariable.integer(id=0, name="x_1")
-    x_2 = DecisionVariable.integer(id=1, name="x_2")
-
-    objective = x_1 + x_2
-    constraints = x_1 * x_2 == 0
-
+@pytest.mark.parametrize(
+    ("variable", "kind"),
+    [
+        (DecisionVariable.integer(0), Kind.Integer),
+        (DecisionVariable.continuous(0), Kind.Continuous),
+        (DecisionVariable.semi_integer(0, lower=1, upper=3), Kind.SemiInteger),
+        (
+            DecisionVariable.semi_continuous(0, lower=1, upper=3),
+            Kind.SemiContinuous,
+        ),
+    ],
+)
+def test_rejects_used_unsupported_variable_kinds(variable, kind):
     instance = Instance.from_components(
-        decision_variables=[x_1, x_2],
-        objective=objective,
-        constraints={0: constraints},
-        sense=Instance.MAXIMIZE,
+        decision_variables=[variable],
+        objective=variable,
+        constraints={},
+        sense=Sense.Minimize,
     )
+    before = instance.to_v2_bytes()
 
-    return instance
+    with pytest.raises(AdapterNotApplicableError) as error:
+        OMMXDA4Adapter(instance)
+
+    [mismatch] = error.value.report.input_membership.clause_reports[0].mismatches
+    assert isinstance(mismatch, InstanceClassMismatch.VariableKindNotAllowed)
+    assert mismatch.kind == kind
+    assert mismatch.variable_ids == {0}
+    assert mismatch.allowed_kinds == {Kind.Binary}
+    assert instance.to_v2_bytes() == before
 
 
-def test_check_integer_variable(instance_for_integer_variable):
-    with pytest.raises(
-        OMMXDA4AdapterError,
-        match=r"The decision variable must be binary: id .*",
-    ):
-        OMMXDA4Adapter(instance_for_integer_variable)
-
-
-@pytest.fixture
-def instance_for_continuous_variable():
-    x_1 = DecisionVariable.continuous(id=0, name="x_1")
-    x_2 = DecisionVariable.continuous(id=1, name="x_2")
-
-    objective = x_1 + x_2
-    constraints = x_1 * x_2 == 0
-
+def test_accepts_unused_unsupported_variable_kind_without_mutating_input():
+    used = DecisionVariable.binary(0)
+    unused = DecisionVariable.integer(1)
     instance = Instance.from_components(
-        decision_variables=[x_1, x_2],
-        objective=objective,
-        constraints={0: constraints},
-        sense=Instance.MAXIMIZE,
+        decision_variables=[used, unused],
+        objective=used,
+        constraints={},
+        sense=Sense.Minimize,
     )
+    before = instance.to_v2_bytes()
 
-    return instance
+    report = OMMXDA4Adapter.check_applicability(instance)
+    OMMXDA4Adapter(instance)
+
+    assert report.is_applicable
+    assert report.input_membership.matching_clauses == [
+        (0, "da4-binary-polynomial-with-one-hot")
+    ]
+    assert report.preconditions_checked
+    assert report.precondition_violations == ()
+    assert instance.to_v2_bytes() == before
 
 
-def test_check_continuous_variable(instance_for_continuous_variable):
-    with pytest.raises(
-        OMMXDA4AdapterError,
-        match=r"The decision variable must be binary: id .*",
-    ):
-        OMMXDA4Adapter(instance_for_continuous_variable)
+def test_rejects_unsupported_special_constraints_without_mutating_input():
+    x = DecisionVariable.binary(0)
+    y = DecisionVariable.binary(1)
+    instance = Instance.from_components(
+        decision_variables=[x, y],
+        objective=x + y,
+        constraints={},
+        indicator_constraints={10: (y <= 0).with_indicator(x)},
+        sos1_constraints={30: Sos1Constraint(variables=[x, y])},
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    report = OMMXDA4Adapter.check_applicability(instance)
+    assert not report.is_applicable
+    assert not report.input_membership.is_member
+    assert not report.preconditions_checked
+    assert report.precondition_violations == ()
+    assert instance.to_v2_bytes() == before
+
+    with pytest.raises(AdapterNotApplicableError) as error:
+        OMMXDA4Adapter(instance)
+
+    mismatches = error.value.report.input_membership.clause_reports[0].mismatches
+    by_type = {type(mismatch): mismatch for mismatch in mismatches}
+    assert set(by_type) == {
+        InstanceClassMismatch.IndicatorConstraintsNotAllowed,
+        InstanceClassMismatch.Sos1ConstraintsNotAllowed,
+    }
+
+    indicator = by_type[InstanceClassMismatch.IndicatorConstraintsNotAllowed]
+    assert isinstance(indicator, InstanceClassMismatch.IndicatorConstraintsNotAllowed)
+    assert indicator.constraint_ids == {10}
+
+    sos1 = by_type[InstanceClassMismatch.Sos1ConstraintsNotAllowed]
+    assert isinstance(sos1, InstanceClassMismatch.Sos1ConstraintsNotAllowed)
+    assert sos1.constraint_ids == {30}
+    assert instance.to_v2_bytes() == before
 
 
 @pytest.fixture
@@ -487,7 +564,7 @@ def test_no_inequalities(instance_for_no_inequalities):
 def instance_with_a_one_hot_constraint():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    onehot = OneHotConstraint(variables=[1, 2, 3])
+    onehot = OneHotConstraint(variables=[x[1], x[2], x[3]])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
@@ -555,8 +632,8 @@ def instance_with_various_constraints():
 
     assert isinstance(constraint_2, Constraint)
 
-    onehot_0 = OneHotConstraint(variables=[0, 1, 2])
-    onehot_1 = OneHotConstraint(variables=[3, 4, 5, 6, 7])
+    onehot_0 = OneHotConstraint(variables=[x[0], x[1], x[2]])
+    onehot_1 = OneHotConstraint(variables=[x[3], x[4], x[5], x[6], x[7]])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
@@ -646,8 +723,8 @@ def test_one_way_one_hot_groups_with_no_one_hot_constraint(
 def instance_with_duplicates():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    onehot_0 = OneHotConstraint(variables=[0, 1])
-    onehot_1 = OneHotConstraint(variables=[1, 2, 3])
+    onehot_0 = OneHotConstraint(variables=[x[0], x[1]])
+    onehot_1 = OneHotConstraint(variables=[x[1], x[2], x[3]])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
@@ -676,12 +753,19 @@ def test_variable_map_with_duplicates(instance_with_duplicates):
     }
 
 
-def test_overlapping_one_hot_constraint_is_converted(instance_with_duplicates):
-    OMMXDA4Adapter(instance_with_duplicates)
+def test_overlapping_one_hot_constraints_are_partitioned_without_mutating_input(
+    instance_with_duplicates,
+):
+    before = instance_with_duplicates.to_v2_bytes()
 
-    assert set(instance_with_duplicates.one_hot_constraints) == {1}
-    assert set(instance_with_duplicates.removed_one_hot_constraints) == {0}
-    assert len(instance_with_duplicates.constraints) == 1
+    adapter = OMMXDA4Adapter(instance_with_duplicates)
+
+    assert instance_with_duplicates.to_v2_bytes() == before
+    assert set(instance_with_duplicates.one_hot_constraints) == {0, 1}
+    assert instance_with_duplicates.removed_one_hot_constraints == {}
+    assert instance_with_duplicates.constraints == {}
+    assert adapter._one_hot_dict == {1: [1, 2, 3]}
+    assert adapter._penalty_one_hot_dict == {0: [0, 1]}
 
 
 def test_one_way_one_hot_groups_with_duplicates(instance_with_duplicates):
@@ -722,7 +806,7 @@ def test_regular_constraint_is_not_skipped_when_id_matches_one_hot_constraint():
         decision_variables=x,
         objective=sum(x),
         constraints={0: constraint},
-        one_hot_constraints={0: OneHotConstraint(variables=[1, 2, 3])},
+        one_hot_constraints={0: OneHotConstraint(variables=[x[1], x[2], x[3]])},
         sense=Instance.MINIMIZE,
     )
 
