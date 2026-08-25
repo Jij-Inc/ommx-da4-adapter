@@ -30,7 +30,7 @@ Issues = "https://github.com/Jij-Inc/ommx-da4-adapter/issues"
 dev = [
     "pyright",
     "pytest",
-    "ruff",
+    "ruff==0.16.4",
 ]
 
 [tool.setuptools]
@@ -38,3 +38,6 @@ packages = ["ommx_da4_adapter"]
 
 [tool.setuptools_scm]
 version_file = "./ommx_da4_adapter/_version.py"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

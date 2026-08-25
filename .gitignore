@@ -1,5 +1,6 @@
 # Python
 .venv
+benchmark_results/
 build/
 **/*.egg-info
 _version.py
