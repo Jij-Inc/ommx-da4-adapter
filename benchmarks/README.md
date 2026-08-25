@@ -2,6 +2,10 @@
 
 固定seedからOMMX v3 Instanceを直接生成し、`inspect_ommx_v2`と同じ問題を測定します。
 
+## 測定結果
+
+- [2026年8月25日: OMMX v2/v3比較](benchmark-results-20260825.md)
+
 ## Instance
 
 | Instance | 目的関数・制約 | Formulation | 推奨サイズ |
