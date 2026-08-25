@@ -2,6 +2,12 @@
 
 2026年8月25日に、DA4 API・求解を使用せず実施したOMMX v2/v3比較です。
 
+> **注意:** 「v3 Preparationと特殊制約」はworkload整合前の旧測定です。
+> 特に`indicator-sos1`でIndicatorとSOS1をそれぞれ`size`個（合計`2 * size`個）
+> 生成しており、現在の合計`size`個の定義とは一致しません。また、v2 directおよび
+> v3 directとの同一制約による比較を含みません。Preparation関連の性能比較には使用せず、
+> 整合後の再測定結果で置き換える必要があります。通常Instanceのv2/v3比較には影響しません。
+
 - 環境: Apple M2（8 cores）、24 GB、macOS arm64、Python 3.12.10
 - v2: commit `64b8d86`、OMMX 2.6.1、Pydantic 2.13.4、Adapter 0.1.2.dev0+g93ce5c119.d20260825
 - v3: commit `40cd62b`、OMMX 3.0.0b3、Pydantic 2.13.4、Adapter 0.1.2.dev8+g4d516bd47.d20260825
@@ -17,7 +23,7 @@
 - 重複OneHotを含むAssignment/TSPのOneHot表現は、全サイズでv3が高速でした。
 - ウォーム後のResponse → Solutionは21ケース中7ケースでv3が高速でした。特にOneHot表現ではv3が5〜47%遅い結果です。
 - ウォーム後のResponse → Solutionのピークメモリは21ケース中19ケースでv3が減少しました。
-- v3のPreparation中央値は、サイズ30でIndicatorが0.951 ms、SOS1が0.645 ms、両方が1.195 msでした。
+- 旧workloadでのv3 Preparation中央値は、サイズ30でIndicatorが0.951 ms、SOS1が0.645 ms、両方が1.195 msでした（整合後の比較には使用不可）。
 - 初回値と小さいメモリ値は、ランタイム初期化やallocator粒度の影響を受けやすいため、主な比較にはウォーム後の値を使用します。
 
 ## Instance → Request
@@ -129,6 +135,8 @@
 | OneHot baseline | 30 | 1208.680 | 1317.062 | 9.0%増 | 1208.680 | 1180.539 | 2.3%減 |
 
 ## v3 Preparationと特殊制約
+
+> この節はworkload整合前の旧測定です。上記の注意のとおり、現在のdirect／prepared比較には使用できません。
 
 v2にはfirst-classなIndicator/SOS1と`Instance.prepare()`がないため、ここはv3のみです。
 Preparation後のInstance→Requestと合成Response→Solutionも含みます。

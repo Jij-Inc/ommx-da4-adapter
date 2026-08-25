@@ -4,7 +4,7 @@
 
 ## 測定結果
 
-- [2026年8月25日: OMMX v2/v3比較](benchmark-results-20260825.md)
+- [2026年8月25日: OMMX v2/v3比較（Preparation workload整合前）](benchmark-results-20260825.md)
 
 ## Instance
 
@@ -23,21 +23,27 @@ v3では通常制約とfirst-classな`OneHotConstraint`を別々に生成しま�
 
 ## Preparation
 
-`one-hot-preparation`では`--special-constraints`から次を選択します。
+`one-hot-preparation`では`--special-constraints`で比較するlowering式を、
+`--preparation`でdirect／preparedを選択します。`indicator-sos1`は前半の
+グループをIndicator、後半をSOS1とし、特殊制約の合計を常に`size`個にします。
 
-| Case | Source | Preparation後 |
+| Preparation | Adapterへ渡すactive constraints | 用途 |
 | --- | --- | --- |
-| `none` | OneHot | Preparationなし |
-| `indicator` | OneHot + Indicator | OneHotを保持し、Indicatorを通常制約へlower |
-| `sos1` | OneHot + SOS1 | OneHotを保持し、SOS1を通常制約へlower |
-| `indicator-sos1` | OneHot + Indicator + SOS1 | OneHotを保持し、両方をlower |
+| `none` | OneHot `size`個 + lowering後と同じ通常制約 `size`個 | v3 direct。`prepare()`を呼ばない |
+| `recommended` | OneHot `size`個 + lowering済み通常制約 `size`個 | SourceのIndicator/SOS1合計`size`個を事前にlowering |
 
-特殊制約はOneHotから導かれる冗長制約なので、すべてのケースで実行可能領域は同一です。
+`--preparation none`ではactiveなIndicator/SOS1を生成せず、そのlowering結果を
+通常制約として直接生成します。`recommended`のSourceではfirst-classなIndicator/SOS1を
+生成し、Adapterの推奨Policyで通常制約へloweringします。したがってdirectとpreparedは
+active制約数・数式・変数・目的関数・DA4 Requestが同一で、Preparation履歴だけが異なります。
+
+Indicator/SOS1相当制約はOneHotから導かれる冗長制約なので、すべてのケースで
+実行可能領域と目的関数も同一です。v2では同じlowering結果を通常制約として直接生成します。
 
 ## 測定対象
 
 - `prepare`: コピー・Policy生成を除いた`Instance.prepare()`のみ
-- `instance-to-request`: 必要なPreparation後の`OMMXDA4Adapter(instance).sampler_input`
+- `instance-to-request`: direct、または測定外でPreparationした後の`OMMXDA4Adapter(instance).sampler_input`
 - `response-to-solution`: 合成済みの実行可能`QuboResponse`に対する`adapter.decode()`
 
 DA4 API、ネットワーク通信、solver時間は測定に含めません。時間測定では初回実行と、
@@ -71,13 +77,23 @@ for special_constraints in indicator sos1 indicator-sos1; do
   for size in 10 20 30; do
     uv run --frozen python -m benchmarks.timing prepare \
       --instance one-hot-preparation --formulation one-hot \
-      --special-constraints "$special_constraints" --size "$size" \
+      --special-constraints "$special_constraints" \
+      --preparation recommended --size "$size" \
       | tee "benchmark_results/v3-${special_constraints}-prepare-timing-${size}.csv"
 
-    uv run --frozen python -m benchmarks.timing instance-to-request \
-      --instance one-hot-preparation --formulation one-hot \
-      --special-constraints "$special_constraints" --size "$size" \
-      | tee "benchmark_results/v3-${special_constraints}-request-timing-${size}.csv"
+    for preparation in none recommended; do
+      uv run --frozen python -m benchmarks.timing instance-to-request \
+        --instance one-hot-preparation --formulation one-hot \
+        --special-constraints "$special_constraints" \
+        --preparation "$preparation" --size "$size" \
+        | tee "benchmark_results/v3-${special_constraints}-${preparation}-request-timing-${size}.csv"
+
+      uv run --frozen python -m benchmarks.timing response-to-solution \
+        --instance one-hot-preparation --formulation one-hot \
+        --special-constraints "$special_constraints" \
+        --preparation "$preparation" --size "$size" \
+        | tee "benchmark_results/v3-${special_constraints}-${preparation}-decode-timing-${size}.csv"
+    done
   done
 done
 ```
@@ -92,5 +108,13 @@ uv run --frozen --with memray python -m benchmarks.memory instance-to-request \
 
 uv run --frozen --with memray python -m benchmarks.memory prepare \
   --instance one-hot-preparation --formulation one-hot \
-  --special-constraints indicator-sos1 --size 20
+  --special-constraints indicator-sos1 --preparation recommended --size 20
+
+uv run --frozen --with memray python -m benchmarks.memory instance-to-request \
+  --instance one-hot-preparation --formulation one-hot \
+  --special-constraints indicator-sos1 --preparation none --size 20
+
+uv run --frozen --with memray python -m benchmarks.memory instance-to-request \
+  --instance one-hot-preparation --formulation one-hot \
+  --special-constraints indicator-sos1 --preparation recommended --size 20
 ```
