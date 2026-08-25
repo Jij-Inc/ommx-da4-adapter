@@ -253,7 +253,10 @@ def build_clique_instance(
 
 
 def build_one_hot_preparation_instance(
-    size: int, seed: int = 0, formulation: str = "one-hot"
+    size: int,
+    seed: int = 0,
+    formulation: str = "one-hot",
+    special_constraints: str = "none",
 ) -> Instance:
     """Build the OMMX v2 baseline for the v3 preparation workload."""
     _check_size(size, minimum=2)
@@ -261,6 +264,13 @@ def build_one_hot_preparation_instance(
         raise ValueError(
             "The one-hot-preparation Instance supports only one-hot formulation"
         )
+    if special_constraints not in (
+        "none",
+        "indicator",
+        "sos1",
+        "indicator-sos1",
+    ):
+        raise ValueError(f"Unknown special constraints: {special_constraints}")
     random_generator = random.Random(seed)
 
     def variable_id(group: int, choice: int) -> int:
@@ -282,6 +292,41 @@ def build_one_hot_preparation_instance(
         for group in range(size)
     ]
     constraints, constraint_hints = _build_one_hot_constraints(specs, formulation)
+
+    if special_constraints != "none":
+        indicator_group_count = (
+            (size + 1) // 2 if special_constraints == "indicator-sos1" else size
+        )
+
+        def constraint_kind(group: int) -> str:
+            if special_constraints == "indicator":
+                return "indicator"
+            if special_constraints == "sos1":
+                return "sos1"
+            return "indicator" if group < indicator_group_count else "sos1"
+
+        constraints.extend(
+            Constraint(
+                id=size + group,
+                function=Linear(
+                    terms=(
+                        {
+                            variable_id: (size - 1 if index == 0 else 1)
+                            for index, variable_id in enumerate(variable_ids)
+                        }
+                        if constraint_kind(group) == "indicator"
+                        else {variable_id: 1 for variable_id in variable_ids}
+                    ),
+                    constant=(
+                        -(size - 1) if constraint_kind(group) == "indicator" else -1
+                    ),
+                ),
+                equality=Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
+                name=f"lowered-{constraint_kind(group)}",
+                subscripts=[group],
+            )
+            for group, (_, _, variable_ids) in enumerate(specs)
+        )
 
     return Instance.from_components(
         decision_variables=variables,

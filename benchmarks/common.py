@@ -33,6 +33,7 @@ INSTANCE_BUILDERS = {
 INSTANCE_NAMES = tuple(INSTANCE_BUILDERS)
 FORMULATIONS = ("regular", "one-hot")
 SPECIAL_CONSTRAINT_CASES = ("none", "indicator", "sos1", "indicator-sos1")
+PREPARATIONS = ("none",)
 PACKAGE_VERSIONS = (
     version("ommx"),
     version("pydantic"),
@@ -54,10 +55,22 @@ def build_instance(
     seed: int,
     formulation: str,
     special_constraints: str = "none",
+    preparation: str = "none",
 ) -> Instance:
     """Select and build a benchmark Instance."""
+    if preparation != "none":
+        raise ValueError("OMMX v2 does not support Instance preparation")
+    if name == "one-hot-preparation":
+        return build_one_hot_preparation_instance(
+            size,
+            seed,
+            formulation,
+            special_constraints,
+        )
     if special_constraints != "none":
-        raise ValueError("OMMX v2 does not support Indicator or SOS1 constraints")
+        raise ValueError(
+            "Special-constraint workloads are available only for one-hot-preparation"
+        )
     return INSTANCE_BUILDERS[name](size, seed, formulation)
 
 
@@ -113,7 +126,3 @@ def make_benchmark_operation(
         setup=lambda: response,
         run=lambda target: adapter.decode(target),
     )
-
-
-def preparation_name(special_constraints: str) -> str:
-    return "none"

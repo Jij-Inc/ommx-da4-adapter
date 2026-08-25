@@ -18,8 +18,18 @@ v2のOneHotは通常の等式制約と`ConstraintHints.OneHot`の組で表現し
 groupに採用されなかったOneHotは、通常の等式制約としてペナルティへ変換されます。
 
 `one-hot-preparation`はv3版と同じ変数・目的関数・OneHotグループを持つbaselineです。
-v2にはfirst-classなIndicator/SOS1と`Instance.prepare()`がないため、
-`--special-constraints none`かつPreparationなしで測定します。
+v2にはfirst-classなIndicator/SOS1と`Instance.prepare()`がないため、特殊制約を
+指定した場合はv3のlowering後と同じ不等式を通常制約として直接生成します。
+
+| `--special-constraints` | 通常制約として追加するlowering結果 |
+| --- | --- |
+| `none` | なし |
+| `indicator` | Indicator相当を`size`個 |
+| `sos1` | SOS1相当を`size`個 |
+| `indicator-sos1` | 合計`size`個（前半Indicator相当、後半SOS1相当） |
+
+このため、v2の直接変換とv3の直接変換／`recommended` Preparation後では、
+変数・目的関数・OneHot・通常制約の数と内容を揃えて比較できます。
 
 ## 測定対象
 
@@ -53,11 +63,20 @@ for formulation in regular one-hot; do
   done
 done
 
-for size in 10 20 30; do
-  uv run --frozen python -m benchmarks.timing instance-to-request \
-    --instance one-hot-preparation --formulation one-hot \
-    --special-constraints none --size "$size" \
-    | tee "benchmark_results/v2-one-hot-preparation-request-timing-${size}.csv"
+for special_constraints in none indicator sos1 indicator-sos1; do
+  for size in 10 20 30; do
+    uv run --frozen python -m benchmarks.timing instance-to-request \
+      --instance one-hot-preparation --formulation one-hot \
+      --special-constraints "$special_constraints" --preparation none \
+      --size "$size" \
+      | tee "benchmark_results/v2-one-hot-preparation-${special_constraints}-request-timing-${size}.csv"
+
+    uv run --frozen python -m benchmarks.timing response-to-solution \
+      --instance one-hot-preparation --formulation one-hot \
+      --special-constraints "$special_constraints" --preparation none \
+      --size "$size" \
+      | tee "benchmark_results/v2-one-hot-preparation-${special_constraints}-decode-timing-${size}.csv"
+  done
 done
 ```
 
@@ -71,4 +90,8 @@ uv run --frozen --with memray python -m benchmarks.memory instance-to-request \
 
 uv run --frozen --with memray python -m benchmarks.memory response-to-solution \
   --instance tsp --formulation one-hot --size 20
+
+uv run --frozen --with memray python -m benchmarks.memory instance-to-request \
+  --instance one-hot-preparation --formulation one-hot \
+  --special-constraints indicator-sos1 --preparation none --size 20
 ```
