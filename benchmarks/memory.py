@@ -4,6 +4,7 @@ import argparse
 import gc
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 from benchmarks.common import (
     FORMULATIONS,
@@ -58,6 +59,7 @@ def main() -> None:
     with TemporaryDirectory() as directory:
         first_capture = Path(directory) / "first.bin"
         first_context = benchmark.setup()
+        first_result: Any = None
         with memray.Tracker(first_capture):
             first_result = benchmark.run(first_context)
         del first_result
@@ -69,6 +71,7 @@ def main() -> None:
         gc.collect()
         warmed_capture = Path(directory) / "warmed.bin"
         context = benchmark.setup()
+        result: Any = None
         with memray.Tracker(warmed_capture):
             result = benchmark.run(context)
         del result
