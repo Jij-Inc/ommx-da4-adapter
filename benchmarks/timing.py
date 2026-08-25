@@ -1,0 +1,112 @@
+from __future__ import annotations
+
+import argparse
+import gc
+import statistics
+import time
+
+from benchmarks.common import (
+    FORMULATIONS,
+    INSTANCE_NAMES,
+    PACKAGE_VERSIONS,
+    SPECIAL_CONSTRAINT_CASES,
+    build_instance,
+    make_benchmark_operation,
+    preparation_name,
+)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "operation", choices=("instance-to-request", "response-to-solution")
+    )
+    parser.add_argument("--instance", choices=INSTANCE_NAMES, default="tsp")
+    parser.add_argument("--formulation", choices=FORMULATIONS, default="regular")
+    parser.add_argument(
+        "--special-constraints", choices=SPECIAL_CONSTRAINT_CASES, default="none"
+    )
+    parser.add_argument("--size", required=True, type=int)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--sample-count", type=int, default=16)
+    parser.add_argument("--warmup", type=int, default=3)
+    parser.add_argument("--repeat", type=int, default=20)
+    args = parser.parse_args()
+
+    try:
+        instance = build_instance(
+            args.instance,
+            args.size,
+            args.seed,
+            args.formulation,
+            args.special_constraints,
+        )
+        benchmark = make_benchmark_operation(
+            args.operation,
+            instance,
+            args.instance,
+            args.size,
+            args.sample_count,
+        )
+    except ValueError as error:
+        parser.error(str(error))
+
+    print(
+        "operation,instance,formulation,special_constraints,preparation,size,"
+        "sample_count,first_seconds,median_seconds,ommx_version,pydantic_version,"
+        "adapter_version"
+    )
+
+    gc_was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        gc.collect()
+        first_context = benchmark.setup()
+        start = time.perf_counter()
+        first_result = benchmark.run(first_context)
+        first_seconds = time.perf_counter() - start
+        del first_result
+        del first_context
+    finally:
+        if gc_was_enabled:
+            gc.enable()
+
+    for _ in range(args.warmup):
+        context = benchmark.setup()
+        result = benchmark.run(context)
+        del result
+        del context
+
+    samples: list[float] = []
+    gc_was_enabled = gc.isenabled()
+    gc.disable()
+    try:
+        for _ in range(args.repeat):
+            gc.collect()
+            context = benchmark.setup()
+            start = time.perf_counter()
+            result = benchmark.run(context)
+            samples.append(time.perf_counter() - start)
+            del result
+            del context
+    finally:
+        if gc_was_enabled:
+            gc.enable()
+
+    print(
+        args.operation,
+        args.instance,
+        args.formulation,
+        args.special_constraints,
+        preparation_name(args.special_constraints),
+        args.size,
+        args.sample_count,
+        f"{first_seconds:.9f}",
+        f"{statistics.median(samples):.9f}",
+        *PACKAGE_VERSIONS,
+        sep=",",
+    )
+
+
+if __name__ == "__main__":
+    main()

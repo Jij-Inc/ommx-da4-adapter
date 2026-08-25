@@ -8,17 +8,17 @@ dynamic = ["version"]
 description = "An adapter for the Digital Annealer V4 from/to OMMX."
 authors = [{ name = "Jij Inc.", email = "info@j-ij.com" }]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "ommx>=2.0.3,<3.0.0",
+    # Latest release in the OMMX v2 series. Keep the benchmark baseline stable.
+    "ommx==2.6.1",
     "requests>=2.25.0,<3.0.0",
     "pydantic>=2.10.0,<3.0.0",
 ]
@@ -31,7 +31,7 @@ Issues = "https://github.com/Jij-Inc/ommx-da4-adapter/issues"
 dev = [
     "pyright",
     "pytest",
-    "ruff",
+    "ruff==0.15.21",
 ]
 
 [tool.setuptools]
@@ -39,3 +39,6 @@ packages = ["ommx_da4_adapter"]
 
 [tool.setuptools_scm]
 version_file = "./ommx_da4_adapter/_version.py"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
