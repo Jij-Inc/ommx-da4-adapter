@@ -1,3 +1,4 @@
+import copy
 from typing import ClassVar, Literal
 
 from ommx import (
@@ -38,7 +39,7 @@ _UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS = {
 
 
 class OMMXDA4Adapter(SamplerAdapter):
-    INPUT_CLASS: ClassVar[InstanceClass | None] = InstanceClass(
+    INPUT_CLASS: ClassVar[InstanceClass] = InstanceClass(
         [
             InstanceClassClause(
                 label="da4-binary-polynomial-with-one-hot",
@@ -175,21 +176,59 @@ class OMMXDA4Adapter(SamplerAdapter):
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
     ) -> SampleSet:
-        """Sample the result in DA4 with DA4Client.
+        """Prepare an isolated copy and sample it with DA4Client.
 
-        :param ommx_instance: OMMX instance
+        The input instance is not modified. An isolated copy is prepared with
+        the recommended DA4 policy before preparation-free execution.
+
+        :param ommx_instance: OMMX instance to prepare and sample
         :param token: Authentication token for DA4 API. Defaults to None.
         :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved diagnostics sink; currently unused.
         :return: SampleSet
         """
+        prepared = copy.copy(ommx_instance)
+        prepared.prepare(
+            cls.INPUT_CLASS,
+            cls.recommended_preparation_policy(),
+        )
+        return cls.sample_without_preparation(
+            prepared,
+            token=token,
+            url=url,
+            version=version,
+            diagnostics=diagnostics,
+        )
+
+    @classmethod
+    def sample_without_preparation(
+        cls,
+        ommx_instance: Instance,
+        *,
+        token: str | None = None,
+        url: str = "https://api.aispf.global.fujitsu.com/da",
+        version: Literal["v4", "v3c"] = "v4",
+        diagnostics: DiagnosticsSink | None = None,
+    ) -> SampleSet:
+        """Sample an exact DA4 Adapter input without preparing it.
+
+        The input instance must belong to ``INPUT_CLASS`` and is not modified.
+
+        :param ommx_instance: OMMX instance belonging to ``INPUT_CLASS``
+        :param token: Authentication token for DA4 API. Defaults to None.
+        :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
+        :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved diagnostics sink; currently unused.
+        :return: SampleSet
+        """
+        adapter = cls(ommx_instance)
         if token is None:
             raise OMMXDA4AdapterError(
                 "token is required. Please set the token to use the DA4 API."
             )
 
         _ = diagnostics
-        adapter = cls(ommx_instance)
         qubo_request = adapter.sampler_input
         client = DA4Client(token=token, url=url, version=version)
         qubo_response = client.sample(qubo_request=qubo_request)
@@ -208,20 +247,49 @@ class OMMXDA4Adapter(SamplerAdapter):
     ) -> Solution:
         """Solve the result in DA4 with DA4Client.
 
-        :param ommx_instance: OMMX instance
+        The input instance is not modified. An isolated copy is prepared with
+        the recommended DA4 policy before preparation-free execution.
+
+        :param ommx_instance: OMMX instance to prepare and solve
         :param token: Authentication token for DA4 API. Defaults to None.
         :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
         :return: Solution
         """
-        sample_set = cls.sample(
-            ommx_instance,
+        prepared = copy.copy(ommx_instance)
+        prepared.prepare(
+            cls.INPUT_CLASS,
+            cls.recommended_preparation_policy(),
+        )
+        return cls.solve_without_preparation(
+            prepared,
             token=token,
             url=url,
             version=version,
             diagnostics=diagnostics,
         )
-        return sample_set.best_feasible
+
+    @classmethod
+    def solve_without_preparation(
+        cls,
+        ommx_instance: Instance,
+        *,
+        token: str | None = None,
+        url: str = "https://api.aispf.global.fujitsu.com/da",
+        version: Literal["v4", "v3c"] = "v4",
+        diagnostics: DiagnosticsSink | None = None,
+    ) -> Solution:
+        """Sample an exact DA4 Adapter input and return its best solution.
+
+        The input instance must belong to ``INPUT_CLASS`` and is not modified.
+        """
+        return cls.sample_without_preparation(
+            ommx_instance,
+            token=token,
+            url=url,
+            version=version,
+            diagnostics=diagnostics,
+        ).best_feasible
 
     def decode_to_sampleset(self, data: QuboResponse) -> SampleSet:
         """Decode QuboResponse to SampleSet.
