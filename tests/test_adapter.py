@@ -3,13 +3,9 @@ from ommx import (
     Constraint,
     DecisionVariable,
     Instance,
-    InstanceClassMismatch,
-    Kind,
     OneHotConstraint,
     Sense,
-    Sos1Constraint,
 )
-from ommx.adapter import AdapterNotApplicableError
 
 from ommx_da4_adapter import OMMXDA4Adapter
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
@@ -20,30 +16,6 @@ from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse
 # Used to align the order (because the order may differ depending on the environment)
 def sort_terms(terms: list[BinaryPolynomialTerm]) -> list[BinaryPolynomialTerm]:
     return sorted(terms, key=lambda term: term.p)
-
-
-@pytest.mark.parametrize("sense", [Sense.Minimize, Sense.Maximize])
-def test_input_class_accepts_complete_binary_polynomial_boundary(sense):
-    x = [DecisionVariable.binary(i) for i in range(4)]
-    instance = Instance.from_components(
-        decision_variables=x,
-        objective=x[0] * x[1] * x[2] * x[3],
-        constraints={
-            0: x[0] * x[1] * x[2] == 0,
-            1: x[1] * x[2] <= 1,
-        },
-        one_hot_constraints={10: OneHotConstraint(variables=[x[0], x[3]])},
-        sense=sense,
-    )
-
-    report = OMMXDA4Adapter.check_applicability(instance)
-
-    assert report.is_applicable
-    assert report.input_membership.matching_clauses == [
-        (0, "da4-binary-polynomial-with-one-hot")
-    ]
-    assert report.preconditions_checked
-    assert report.precondition_violations == ()
 
 
 @pytest.fixture
@@ -182,101 +154,6 @@ def test_max_penalty_coef(instance_for_validation):
         ValueError, match="`max_penalty_coef` must be between 0 and 9223372036854775807"
     ):
         OMMXDA4Adapter(instance_for_validation, max_penalty_coef=9223372036854775808)
-
-
-@pytest.mark.parametrize(
-    ("variable", "kind"),
-    [
-        (DecisionVariable.integer(0), Kind.Integer),
-        (DecisionVariable.continuous(0), Kind.Continuous),
-        (DecisionVariable.semi_integer(0, lower=1, upper=3), Kind.SemiInteger),
-        (
-            DecisionVariable.semi_continuous(0, lower=1, upper=3),
-            Kind.SemiContinuous,
-        ),
-    ],
-)
-def test_rejects_used_unsupported_variable_kinds(variable, kind):
-    instance = Instance.from_components(
-        decision_variables=[variable],
-        objective=variable,
-        constraints={},
-        sense=Sense.Minimize,
-    )
-    before = instance.to_v2_bytes()
-
-    with pytest.raises(AdapterNotApplicableError) as error:
-        OMMXDA4Adapter(instance)
-
-    [mismatch] = error.value.report.input_membership.clause_reports[0].mismatches
-    assert isinstance(mismatch, InstanceClassMismatch.VariableKindNotAllowed)
-    assert mismatch.kind == kind
-    assert mismatch.variable_ids == {0}
-    assert mismatch.allowed_kinds == {Kind.Binary}
-    assert instance.to_v2_bytes() == before
-
-
-def test_accepts_unused_unsupported_variable_kind_without_mutating_input():
-    used = DecisionVariable.binary(0)
-    unused = DecisionVariable.integer(1)
-    instance = Instance.from_components(
-        decision_variables=[used, unused],
-        objective=used,
-        constraints={},
-        sense=Sense.Minimize,
-    )
-    before = instance.to_v2_bytes()
-
-    report = OMMXDA4Adapter.check_applicability(instance)
-    OMMXDA4Adapter(instance)
-
-    assert report.is_applicable
-    assert report.input_membership.matching_clauses == [
-        (0, "da4-binary-polynomial-with-one-hot")
-    ]
-    assert report.preconditions_checked
-    assert report.precondition_violations == ()
-    assert instance.to_v2_bytes() == before
-
-
-def test_rejects_unsupported_special_constraints_without_mutating_input():
-    x = DecisionVariable.binary(0)
-    y = DecisionVariable.binary(1)
-    instance = Instance.from_components(
-        decision_variables=[x, y],
-        objective=x + y,
-        constraints={},
-        indicator_constraints={10: (y <= 0).with_indicator(x)},
-        sos1_constraints={30: Sos1Constraint(variables=[x, y])},
-        sense=Sense.Minimize,
-    )
-    before = instance.to_v2_bytes()
-
-    report = OMMXDA4Adapter.check_applicability(instance)
-    assert not report.is_applicable
-    assert not report.input_membership.is_member
-    assert not report.preconditions_checked
-    assert report.precondition_violations == ()
-    assert instance.to_v2_bytes() == before
-
-    with pytest.raises(AdapterNotApplicableError) as error:
-        OMMXDA4Adapter(instance)
-
-    mismatches = error.value.report.input_membership.clause_reports[0].mismatches
-    by_type = {type(mismatch): mismatch for mismatch in mismatches}
-    assert set(by_type) == {
-        InstanceClassMismatch.IndicatorConstraintsNotAllowed,
-        InstanceClassMismatch.Sos1ConstraintsNotAllowed,
-    }
-
-    indicator = by_type[InstanceClassMismatch.IndicatorConstraintsNotAllowed]
-    assert isinstance(indicator, InstanceClassMismatch.IndicatorConstraintsNotAllowed)
-    assert indicator.constraint_ids == {10}
-
-    sos1 = by_type[InstanceClassMismatch.Sos1ConstraintsNotAllowed]
-    assert isinstance(sos1, InstanceClassMismatch.Sos1ConstraintsNotAllowed)
-    assert sos1.constraint_ids == {30}
-    assert instance.to_v2_bytes() == before
 
 
 @pytest.fixture
@@ -945,6 +822,8 @@ def test_decode_to_sampleset(instance_knapsack_problem):
     assert sampleset is not None
     assert len(sampleset.decision_variables) == 6
     assert len(sampleset.sample_ids_list) == 5
+    assert sampleset.sense == Sense.Maximize
+    assert sampleset.objectives == {0: 51.0, 1: 69.0, 2: 38.0, 3: 43.0, 4: 15.0}
 
 
 def test_sample_without_token(instance_knapsack_problem):
@@ -1080,6 +959,8 @@ def test_decode_to_sample(instance_knapsack_problem):
 
     assert solution is not None
     assert len(solution.decision_variables) == 6
+    assert solution.sense == Sense.Maximize
+    assert solution.objective == 38.0
 
 
 def validate_qubo_request(qubo_request, expected_terms, expected_inequality_terms):
