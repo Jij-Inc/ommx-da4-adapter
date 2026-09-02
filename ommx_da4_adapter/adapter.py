@@ -418,6 +418,11 @@ class OMMXDA4Adapter(SamplerAdapter):
             for key, value in terms.items()
         ]
 
+        # DA4 starts one-way one-hot groups at the minimum polynomial variable.
+        # Native groups start at 0, so add the required zero-coefficient anchor.
+        if self._one_hot_dict:
+            binary_polynomial_terms.append(BinaryPolynomialTerm(c=0.0, p=[0, 0]))
+
         return BinaryPolynomial(terms=binary_polynomial_terms)
 
     def _generate_penalty_binary_polynomial(
