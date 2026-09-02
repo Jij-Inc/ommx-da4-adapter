@@ -9,8 +9,7 @@ pip install ommx-da4-adapter
 ```
 
 ## Usage
-
-Here's a simple example using `sample()`:
+Here's a simple example of how to use the adapter directly:
 
 ```python
 from ommx import Instance
@@ -29,17 +28,12 @@ ommx_sampleset = OMMXDA4Adapter.sample(
 )
 ```
 
-DA4 directly accepts binary polynomial minimization and maximization problems
-with equality, less-than-or-equal, and OneHot constraints. The recommended
-preparation policy preserves OneHot constraints for DA4's native one-way
-one-hot groups and lowers unsupported Indicator and SOS1 constraints.
-
-You can use it with
-`DA4Client` directly when you need access to the request and response:
+You can also use the adapter and client separately:
 
 ```python
 from ommx_da4_adapter import OMMXDA4Adapter, DA4Client
 
+# Assuming ommx_instance is already defined as above
 adapter = OMMXDA4Adapter(ommx_instance)
 
 qubo_request = adapter.sampler_input
