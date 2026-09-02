@@ -418,8 +418,12 @@ class OMMXDA4Adapter(SamplerAdapter):
             for key, value in terms.items()
         ]
 
-        # DA4 starts one-way one-hot groups at the minimum polynomial variable.
-        # Native groups start at 0, so add the required zero-coefficient anchor.
+        # DA4 starts one-way one-hot groups at the minimum polynomial variable
+        # and requires it as a quadratic term even with coefficient 0. This
+        # adapter maps native one-hot variables from 0, which the objective may omit.
+        # Example: one-hot on x0, x1, x2 (numbers=[3]), objective x3 + 2*x4
+        #   without this term: terms {p=[3], p=[4]}        -> group {3, 4, 5}
+        #   with this term:    terms {p=[0, 0], p=[3], p=[4]} -> group {0, 1, 2}
         if self._one_hot_dict:
             binary_polynomial_terms.append(BinaryPolynomialTerm(c=0.0, p=[0, 0]))
 
@@ -471,7 +475,7 @@ class OMMXDA4Adapter(SamplerAdapter):
                 add_term(key, value)
 
         # DA4 one-way one-hot groups cannot share decision variables. Treat each
-        # overlapping group that was not selected for native handling as the
+        # overlapping group that is not passed to one_way_one_hot_groups as the
         # regular equality sum(x_i) - 1 = 0. For binary variables, its square is
         # 2 * sum_{i < j}(x_i * x_j) - sum_i(x_i) + 1.
         for variables in self._penalty_one_hot_dict.values():
@@ -608,7 +612,7 @@ class OMMXDA4Adapter(SamplerAdapter):
     def _partition_one_hot_constraints(
         self,
     ) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
-        """Partition one-hot constraints for native and penalty handling.
+        """Partition one-hot constraints into one_way_one_hot_groups and penalty handling.
 
         Examples:
         =========
@@ -624,8 +628,8 @@ class OMMXDA4Adapter(SamplerAdapter):
         penalty_one_hot_dict = {}
 
         case 2：duplicate decision variables
-        Prioritize longer constraints for native handling and send shorter ones
-        to penalty handling
+        Prioritize longer constraints for one_way_one_hot_groups and send shorter
+        ones to penalty handling
         constraint_1: id=0, x₀ + x₁ + x₂ = 1
         constraint_2: id=1, x₁ + x₃ = 1
         one_hot_dict = {
