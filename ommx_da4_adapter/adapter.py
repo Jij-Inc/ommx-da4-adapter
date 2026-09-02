@@ -382,11 +382,17 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         instance = self._ommx_instance
 
-        function = instance.objective
-
-        # if sense is maximize, multiply by -1 (DA4 only supports minimization)
-        if instance.sense == Instance.MAXIMIZE:
+        if instance.sense == Instance.MINIMIZE:
+            function = instance.objective
+        elif instance.sense == Instance.MAXIMIZE:
+            # DA4 only supports minimization, so multiply the objective by -1.
             function = -instance.objective
+        else:
+            raise AssertionError(
+                "Unsupported objective sense reached after applicability validation: "
+                f"{instance.sense}. This may indicate an OMMX implementation bug; "
+                "please report it to OMMX."
+            )
 
         # get objective terms
         terms = function.terms
@@ -426,7 +432,19 @@ class OMMXDA4Adapter(SamplerAdapter):
                 squared_terms_dict.get(binary_key, 0.0) + value
             )
 
-        for constraint in instance.constraints.values():
+        supported_equalities = {
+            Constraint.EQUAL_TO_ZERO,
+            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
+        }
+        for constraint_id, constraint in instance.constraints.items():
+            if constraint.equality not in supported_equalities:
+                raise AssertionError(
+                    "Unsupported constraint equality reached after applicability "
+                    f"validation: {constraint.equality} for constraint "
+                    f"{constraint_id}. This may indicate an OMMX implementation "
+                    "bug; please report it to OMMX."
+                )
+
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
@@ -469,7 +487,19 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         inequalities_list = []
+        supported_equalities = {
+            Constraint.EQUAL_TO_ZERO,
+            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
+        }
         for constraint_id, constraint in instance.constraints.items():
+            if constraint.equality not in supported_equalities:
+                raise AssertionError(
+                    "Unsupported constraint equality reached after applicability "
+                    f"validation: {constraint.equality} for constraint "
+                    f"{constraint_id}. This may indicate an OMMX implementation "
+                    "bug; please report it to OMMX."
+                )
+
             # skip if not inequality constraints
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 continue
@@ -524,6 +554,13 @@ class OMMXDA4Adapter(SamplerAdapter):
                 variable_map[variable] = index
                 index += 1
         for decision_variable in instance.used_decision_variables:
+            if decision_variable.kind != Kind.Binary:
+                raise AssertionError(
+                    "Unsupported decision variable kind reached after applicability "
+                    f"validation: {decision_variable.kind}. This may indicate an "
+                    "OMMX implementation bug; please report it to OMMX."
+                )
+
             # skip if already in variable_map
             if decision_variable.id in variable_map:
                 continue
