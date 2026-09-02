@@ -119,6 +119,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         self._ommx_instance = ommx_instance
         self._inequalities_lambda = inequalities_lambda
+        self._assert_supported_constraint_equalities()
 
         (
             self._one_hot_dict,
@@ -377,6 +378,17 @@ class OMMXDA4Adapter(SamplerAdapter):
         sample_set = self.decode_to_sampleset(data)
         return sample_set.best_feasible
 
+    def _assert_supported_constraint_equalities(self) -> None:
+        """Assert that regular constraints match the declared input class."""
+        for constraint_id, constraint in self._ommx_instance.constraints.items():
+            if constraint.equality not in _UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS:
+                raise AssertionError(
+                    "Unsupported constraint equality reached after applicability "
+                    f"validation: {constraint.equality} for constraint "
+                    f"{constraint_id}. This may indicate an OMMX implementation "
+                    "bug; please report it to OMMX."
+                )
+
     def _generate_binary_polynomial(self) -> BinaryPolynomial:
         """Generate BinaryPolynomial from OMMX instance."
 
@@ -434,19 +446,7 @@ class OMMXDA4Adapter(SamplerAdapter):
                 squared_terms_dict.get(binary_key, 0.0) + value
             )
 
-        supported_equalities = {
-            Constraint.EQUAL_TO_ZERO,
-            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
-        }
         for constraint_id, constraint in instance.constraints.items():
-            if constraint.equality not in supported_equalities:
-                raise AssertionError(
-                    "Unsupported constraint equality reached after applicability "
-                    f"validation: {constraint.equality} for constraint "
-                    f"{constraint_id}. This may indicate an OMMX implementation "
-                    "bug; please report it to OMMX."
-                )
-
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
@@ -497,19 +497,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         inequalities_list = []
-        supported_equalities = {
-            Constraint.EQUAL_TO_ZERO,
-            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
-        }
         for constraint_id, constraint in instance.constraints.items():
-            if constraint.equality not in supported_equalities:
-                raise AssertionError(
-                    "Unsupported constraint equality reached after applicability "
-                    f"validation: {constraint.equality} for constraint "
-                    f"{constraint_id}. This may indicate an OMMX implementation "
-                    "bug; please report it to OMMX."
-                )
-
             # skip if not inequality constraints
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 continue
