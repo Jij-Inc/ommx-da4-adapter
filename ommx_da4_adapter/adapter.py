@@ -239,7 +239,6 @@ class OMMXDA4Adapter(SamplerAdapter):
           currently unused.
         :return: SampleSet
         """
-        adapter = cls(ommx_instance)
         if token is None:
             raise OMMXDA4AdapterError(
                 "token is required. Please set the token to use the DA4 API."
@@ -247,6 +246,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         # TODO: Update the diagnostics docstrings when support is implemented.
         _ = diagnostics
+        adapter = cls(ommx_instance)
         qubo_request = adapter.sampler_input
         client = DA4Client(token=token, url=url, version=version)
         qubo_response = client.sample(qubo_request=qubo_request)
