@@ -176,16 +176,23 @@ class OMMXDA4Adapter(SamplerAdapter):
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
     ) -> SampleSet:
-        """Prepare an isolated copy and sample it with DA4Client.
+        """Sample the given ommx.Instance using DA4Client, returning the samples
+        as an ommx.SampleSet.
 
-        The input instance is not modified. An isolated copy is prepared with
-        the recommended DA4 policy before preparation-free execution.
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
 
-        :param ommx_instance: OMMX instance to prepare and sample
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The ommx.Instance to prepare and sample.
         :param token: Authentication token for DA4 API. Defaults to None.
         :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
-        :param diagnostics: Reserved diagnostics sink; currently unused.
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
         :return: SampleSet
         """
         prepared = copy.copy(ommx_instance)
@@ -213,13 +220,23 @@ class OMMXDA4Adapter(SamplerAdapter):
     ) -> SampleSet:
         """Sample an exact DA4 Adapter input without preparing it.
 
-        The input instance must belong to ``INPUT_CLASS`` and is not modified.
+        Use this method when the input instance has already been prepared,
+        possibly with a custom policy, or already belongs to ``INPUT_CLASS``.
 
-        :param ommx_instance: OMMX instance belonging to ``INPUT_CLASS``
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
+
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The exact DA4 Adapter input to sample.
         :param token: Authentication token for DA4 API. Defaults to None.
         :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
-        :param diagnostics: Reserved diagnostics sink; currently unused.
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
         :return: SampleSet
         """
         adapter = cls(ommx_instance)
@@ -228,6 +245,7 @@ class OMMXDA4Adapter(SamplerAdapter):
                 "token is required. Please set the token to use the DA4 API."
             )
 
+        # TODO: Update the diagnostics docstrings when support is implemented.
         _ = diagnostics
         qubo_request = adapter.sampler_input
         client = DA4Client(token=token, url=url, version=version)
@@ -245,15 +263,23 @@ class OMMXDA4Adapter(SamplerAdapter):
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
     ) -> Solution:
-        """Solve the result in DA4 with DA4Client.
+        """Solve the given ommx.Instance using DA4Client, returning the best
+        feasible solution as an ommx.Solution.
 
-        The input instance is not modified. An isolated copy is prepared with
-        the recommended DA4 policy before preparation-free execution.
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
 
-        :param ommx_instance: OMMX instance to prepare and solve
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The ommx.Instance to prepare and solve.
         :param token: Authentication token for DA4 API. Defaults to None.
         :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
         :return: Solution
         """
         prepared = copy.copy(ommx_instance)
@@ -279,9 +305,26 @@ class OMMXDA4Adapter(SamplerAdapter):
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
     ) -> Solution:
-        """Sample an exact DA4 Adapter input and return its best solution.
+        """Solve an exact DA4 Adapter input without preparing it.
 
-        The input instance must belong to ``INPUT_CLASS`` and is not modified.
+        Use this method when the input instance has already been prepared,
+        possibly with a custom policy, or already belongs to ``INPUT_CLASS``.
+
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
+
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The exact DA4 Adapter input to solve.
+        :param token: Authentication token for DA4 API. Defaults to None.
+        :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
+        :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
+        :return: Solution
         """
         return cls.sample_without_preparation(
             ommx_instance,
