@@ -158,7 +158,11 @@ def test_preparation_free_apis_reject_unprepared_input_without_mutation(
     before = instance.to_v2_bytes()
 
     method = getattr(OMMXDA4Adapter, method_name)
-    with pytest.raises(AdapterNotApplicableError):
+    with pytest.raises(AdapterNotApplicableError) as error:
         method(instance, token="test-token")
 
+    mismatches = error.value.report.clause_reports[0].mismatches
+    mismatch_types = {type(mismatch) for mismatch in mismatches}
+    assert InstanceClassMismatch.IndicatorConstraintsNotAllowed in mismatch_types
+    assert InstanceClassMismatch.Sos1ConstraintsNotAllowed in mismatch_types
     assert instance.to_v2_bytes() == before
