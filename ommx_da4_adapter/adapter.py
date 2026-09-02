@@ -32,6 +32,8 @@ from .models import (
     QuboResponse,
 )
 
+ABSOLUTE_TOLERANCE = 1e-6
+
 _UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS = {
     Equality.EqualToZero: DegreeBound.unbounded(),
     Equality.LessThanOrEqualToZero: DegreeBound.unbounded(),
@@ -449,6 +451,14 @@ class OMMXDA4Adapter(SamplerAdapter):
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
 
+            # Only constant case
+            if constraint.function.degree() == 0:
+                if constraint.evaluate({}, atol=ABSOLUTE_TOLERANCE).feasible:
+                    continue
+                raise OMMXDA4AdapterError(
+                    f"Infeasible constant constraint was found: id {constraint_id}"
+                )
+
             function = constraint.function
             squared_function = function * function
 
@@ -503,6 +513,14 @@ class OMMXDA4Adapter(SamplerAdapter):
             # skip if not inequality constraints
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 continue
+
+            # Only constant case
+            if constraint.function.degree() == 0:
+                if constraint.evaluate({}, atol=ABSOLUTE_TOLERANCE).feasible:
+                    continue
+                raise OMMXDA4AdapterError(
+                    f"Infeasible constant constraint was found: id {constraint_id}"
+                )
 
             terms = constraint.function.terms
             inequalities_terms = [

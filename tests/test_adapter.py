@@ -1084,3 +1084,20 @@ def test_relax_constraint():
     )
     actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
     assert actual_inequality_terms == expected_inequality_terms
+
+
+def test_infeasible_constant_equality_constraint_raises_error():
+    x = DecisionVariable.binary(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=x,
+        # x - x + 1 == 0 is a constant constraint that never holds
+        constraints={0: x - x + 1 == 0},
+        sense=Instance.MINIMIZE,
+    )
+
+    with pytest.raises(
+        OMMXDA4AdapterError,
+        match="Infeasible constant constraint was found: id 0",
+    ):
+        OMMXDA4Adapter(instance)
