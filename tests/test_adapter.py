@@ -24,12 +24,12 @@ def instance_for_validation():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = x_1 * x_2 == 0
+    constraint = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints={0: constraints},
+        constraints={0: constraint},
         sense=Instance.MINIMIZE,
     )
 
@@ -358,12 +358,12 @@ def instance_for_MAXIMIZE():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = x_1 * x_2 == 0
+    constraint = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints={0: constraints},
+        constraints={0: constraint},
         sense=Instance.MAXIMIZE,
     )
 
@@ -392,12 +392,12 @@ def instance_for_no_penalty_binary_polynomial():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = x_1 * x_2 <= 0
+    constraint = x_1 * x_2 <= 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints={0: constraints},
+        constraints={0: constraint},
         sense=Instance.MINIMIZE,
     )
 
@@ -417,12 +417,12 @@ def instance_for_no_inequalities():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = x_1 * x_2 == 0
+    constraint = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints={0: constraints},
+        constraints={0: constraint},
         sense=Instance.MINIMIZE,
     )
 
