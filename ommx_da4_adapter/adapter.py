@@ -3,12 +3,12 @@ from typing import ClassVar, Literal
 
 from ommx import (
     Constraint,
-    DegreeBound,
     Equality,
     Instance,
     InstanceClass,
     InstanceClassClause,
     Kind,
+    PolynomialRequirement,
     PreparationPolicy,
     Samples,
     SampleSet,
@@ -34,9 +34,9 @@ from .models import (
 
 ABSOLUTE_TOLERANCE = 1e-6
 
-_UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS = {
-    Equality.EqualToZero: DegreeBound.unbounded(),
-    Equality.LessThanOrEqualToZero: DegreeBound.unbounded(),
+_REGULAR_CONSTRAINT_POLYNOMIAL_REQUIREMENTS = {
+    Equality.EqualToZero: PolynomialRequirement.any_degree(),
+    Equality.LessThanOrEqualToZero: PolynomialRequirement.any_degree(),
 }
 
 
@@ -46,9 +46,9 @@ class OMMXDA4Adapter(SamplerAdapter):
             InstanceClassClause(
                 label="da4-binary-polynomial-with-one-hot",
                 allowed_variable_kinds={Kind.Binary},
-                objective_degree_bound=DegreeBound.unbounded(),
-                regular_constraint_degree_bounds=(
-                    _UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS
+                objective_polynomial_requirement=PolynomialRequirement.any_degree(),
+                regular_constraint_polynomial_requirements=(
+                    _REGULAR_CONSTRAINT_POLYNOMIAL_REQUIREMENTS
                 ),
                 allows_one_hot=True,
                 allowed_senses={Sense.Minimize, Sense.Maximize},
@@ -381,7 +381,7 @@ class OMMXDA4Adapter(SamplerAdapter):
     def _assert_supported_constraint_equalities(self) -> None:
         """Assert that regular constraints match the declared input class."""
         for constraint_id, constraint in self._ommx_instance.constraints.items():
-            if constraint.equality not in _UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS:
+            if constraint.equality not in _REGULAR_CONSTRAINT_POLYNOMIAL_REQUIREMENTS:
                 raise AssertionError(
                     "Unsupported constraint equality reached after applicability "
                     f"validation: {constraint.equality} for constraint "

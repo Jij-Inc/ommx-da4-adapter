@@ -14,10 +14,12 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-    "ommx>=3.0.0b4,<4.0.0",
+    "ommx>=3.0.0b5,<4.0.0",
     "requests>=2.25.0,<3.0.0",
     "pydantic>=2.10.0,<3.0.0",
 ]
