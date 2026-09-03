@@ -3,6 +3,7 @@ from typing import ClassVar, Literal
 
 from ommx import (
     Constraint,
+    DecisionVariable,
     Equality,
     Instance,
     InstanceClass,
@@ -567,7 +568,7 @@ class OMMXDA4Adapter(SamplerAdapter):
                 variable_map[variable] = index
                 index += 1
         for decision_variable in instance.used_decision_variables:
-            if decision_variable.kind != Kind.Binary:
+            if decision_variable.kind != DecisionVariable.BINARY:
                 raise AssertionError(
                     "Unsupported decision variable kind reached after applicability "
                     f"validation: {decision_variable.kind}. This may indicate an "
