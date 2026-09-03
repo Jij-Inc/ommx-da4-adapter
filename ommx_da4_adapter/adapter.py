@@ -377,8 +377,10 @@ class OMMXDA4Adapter(SamplerAdapter):
 
     def _assert_supported_constraint_equalities(self) -> None:
         """Assert that regular constraints match the declared input class."""
-        [clause] = self.INPUT_CLASS.clauses
-        supported_equalities = clause.regular_constraint_polynomial_requirements
+        supported_equalities = {
+            Constraint.EQUAL_TO_ZERO,
+            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
+        }
         for constraint_id, constraint in self._ommx_instance.constraints.items():
             if constraint.equality not in supported_equalities:
                 raise AssertionError(
