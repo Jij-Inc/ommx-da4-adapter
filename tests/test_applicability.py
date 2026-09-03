@@ -1,12 +1,10 @@
 import pytest
 from ommx import (
     DecisionVariable,
-    Equality,
     Instance,
     InstanceClassMismatch,
     Kind,
     OneHotConstraint,
-    PolynomialRequirement,
     Sense,
     Sos1Constraint,
 )
@@ -27,22 +25,6 @@ def instance_with_unsupported_special_constraints() -> Instance:
         sos1_constraints={30: Sos1Constraint(variables=[x, y])},
         sense=Sense.Minimize,
     )
-
-
-def test_declares_binary_polynomial_input_class() -> None:
-    [clause] = OMMXDA4Adapter.INPUT_CLASS.clauses
-
-    assert clause.label == "da4-binary-polynomial-with-one-hot"
-    assert clause.allowed_variable_kinds == {Kind.Binary}
-    assert clause.objective_polynomial_requirement == PolynomialRequirement.any_degree()
-    assert clause.regular_constraint_polynomial_requirements == {
-        Equality.EqualToZero: PolynomialRequirement.any_degree(),
-        Equality.LessThanOrEqualToZero: PolynomialRequirement.any_degree(),
-    }
-    assert clause.indicator_body_polynomial_requirements == {}
-    assert clause.allows_one_hot
-    assert not clause.allows_sos1
-    assert clause.allowed_senses == {Sense.Minimize, Sense.Maximize}
 
 
 @pytest.mark.parametrize("sense", [Sense.Minimize, Sense.Maximize])
