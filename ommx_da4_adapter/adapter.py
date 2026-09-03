@@ -34,11 +34,6 @@ from .models import (
 
 ABSOLUTE_TOLERANCE = 1e-6
 
-_REGULAR_CONSTRAINT_POLYNOMIAL_REQUIREMENTS = {
-    Equality.EqualToZero: PolynomialRequirement.any_degree(),
-    Equality.LessThanOrEqualToZero: PolynomialRequirement.any_degree(),
-}
-
 
 class OMMXDA4Adapter(SamplerAdapter):
     INPUT_CLASS: ClassVar[InstanceClass] = InstanceClass(
@@ -47,9 +42,10 @@ class OMMXDA4Adapter(SamplerAdapter):
                 label="da4-binary-polynomial-with-one-hot",
                 allowed_variable_kinds={Kind.Binary},
                 objective_polynomial_requirement=PolynomialRequirement.any_degree(),
-                regular_constraint_polynomial_requirements=(
-                    _REGULAR_CONSTRAINT_POLYNOMIAL_REQUIREMENTS
-                ),
+                regular_constraint_polynomial_requirements={
+                    Equality.EqualToZero: PolynomialRequirement.any_degree(),
+                    Equality.LessThanOrEqualToZero: PolynomialRequirement.any_degree(),
+                },
                 allows_one_hot=True,
                 allowed_senses={Sense.Minimize, Sense.Maximize},
             )
@@ -380,8 +376,10 @@ class OMMXDA4Adapter(SamplerAdapter):
 
     def _assert_supported_constraint_equalities(self) -> None:
         """Assert that regular constraints match the declared input class."""
+        [clause] = self.INPUT_CLASS.clauses
+        supported_equalities = clause.regular_constraint_polynomial_requirements
         for constraint_id, constraint in self._ommx_instance.constraints.items():
-            if constraint.equality not in _REGULAR_CONSTRAINT_POLYNOMIAL_REQUIREMENTS:
+            if constraint.equality not in supported_equalities:
                 raise AssertionError(
                     "Unsupported constraint equality reached after applicability "
                     f"validation: {constraint.equality} for constraint "
