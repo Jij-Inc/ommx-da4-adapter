@@ -32,7 +32,7 @@ jobs:
       - name: Type check
         if: always()
         run: |
-          uv run pyright
+          uv run pyright ./ommx_da4_adapter
 
       - name: Lint
         if: always()
