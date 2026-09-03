@@ -101,7 +101,7 @@ async def job_runner(
     waiting_job = WaitingJob(
         job_id=job_id,
         qubo_request=qubo_request,
-        start_time=datetime.datetime.now().isoformat(),
+        start_time=datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
     )
     job_store[job_id] = waiting_job
     print(f"[CREATE] job_id: {job_id}, status: {waiting_job.status}")
