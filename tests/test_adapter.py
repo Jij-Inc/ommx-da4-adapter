@@ -32,7 +32,7 @@ def instance_for_validation():
         decision_variables=[x_1, x_2],
         objective=objective,
         constraints={0: constraint},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -188,7 +188,7 @@ def instance():
             2: constraint_inequality_1,
             3: constraint_inequality_2,
         },
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -366,7 +366,7 @@ def instance_for_MAXIMIZE():
         decision_variables=[x_1, x_2],
         objective=objective,
         constraints={0: constraint},
-        sense=Instance.MAXIMIZE,
+        sense=Sense.Maximize,
     )
 
     return instance
@@ -400,7 +400,7 @@ def instance_for_no_penalty_binary_polynomial():
         decision_variables=[x_1, x_2],
         objective=objective,
         constraints={0: constraint},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -425,7 +425,7 @@ def instance_for_no_inequalities():
         decision_variables=[x_1, x_2],
         objective=objective,
         constraints={0: constraint},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -449,7 +449,7 @@ def test_skips_feasible_constant_constraints():
             2: Function(ABSOLUTE_TOLERANCE / 2) <= 0,
             3: Function(-1) <= 0,
         },
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     qubo_request = OMMXDA4Adapter(instance).sampler_input
@@ -472,7 +472,7 @@ def test_rejects_infeasible_constant_constraint(constraint):
         decision_variables=[x],
         objective=x,
         constraints={7: constraint},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     with pytest.raises(
@@ -493,7 +493,7 @@ def instance_with_a_one_hot_constraint():
         objective=objective,
         constraints={},
         one_hot_constraints={0: onehot},
-        sense=Instance.MAXIMIZE,
+        sense=Sense.Maximize,
     )
 
     return ommx_instance
@@ -553,7 +553,7 @@ def test_binary_polynomial_anchors_one_hot_group_start_index():
         objective=x[3],
         constraints={},
         one_hot_constraints={0: OneHotConstraint(variables=[x[0], x[1], x[2]])},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     adapter = OMMXDA4Adapter(instance)
@@ -585,7 +585,7 @@ def instance_with_various_constraints():
         decision_variables=x,
         objective=objective,
         constraints={2: constraint_2},
-        sense=Instance.MAXIMIZE,
+        sense=Sense.Maximize,
         one_hot_constraints={0: onehot_0, 1: onehot_1},
     )
 
@@ -635,7 +635,7 @@ def instance_with_no_one_hot_constraint():
         decision_variables=x,
         objective=objective,
         constraints={0: constraint},
-        sense=Instance.MAXIMIZE,
+        sense=Sense.Maximize,
     )
 
     return ommx_instance
@@ -677,7 +677,7 @@ def instance_with_duplicates():
         objective=objective,
         constraints={},
         one_hot_constraints={0: onehot_0, 1: onehot_1},
-        sense=Instance.MAXIMIZE,
+        sense=Sense.Maximize,
     )
 
     return ommx_instance
@@ -844,7 +844,7 @@ def test_regular_constraint_is_not_skipped_when_id_matches_one_hot_constraint():
         objective=sum(x),
         constraints={0: constraint},
         one_hot_constraints={0: OneHotConstraint(variables=[x[1], x[2], x[3]])},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     adapter = OMMXDA4Adapter(instance)
@@ -885,7 +885,7 @@ def instance_knapsack_problem():
         decision_variables=x,
         objective=objective,
         constraints={0: constraint},
-        sense=Instance.MAXIMIZE,
+        sense=Sense.Maximize,
     )
 
     return instance
@@ -1143,7 +1143,7 @@ def test_partial_evaluate():
         decision_variables=x,
         objective=1 * x[0] + 2 * x[1] + 3 * x[2],
         constraints={0: (1 * x[0] + 2 * x[1] + 3 * x[2] <= 2)},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
     assert instance.used_decision_variables == x
 
@@ -1222,7 +1222,7 @@ def test_relax_constraint():
         decision_variables=x,
         objective=x[0] + x[1],
         constraints={0: (x[0] + 2 * x[1] <= 1), 1: (x[1] + x[2] <= 1)},
-        sense=Instance.MINIMIZE,
+        sense=Sense.Minimize,
     )
 
     assert instance.used_decision_variables == x

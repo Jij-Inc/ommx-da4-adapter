@@ -423,9 +423,9 @@ class OMMXDA4Adapter(SamplerAdapter):
                 "OMMX."
             )
 
-        if instance.sense == Instance.MINIMIZE:
+        if instance.sense == Sense.Minimize:
             function = objective
-        elif instance.sense == Instance.MAXIMIZE:
+        elif instance.sense == Sense.Maximize:
             # DA4 only supports minimization, so multiply the objective by -1.
             function = -objective
         else:
