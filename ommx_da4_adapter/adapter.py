@@ -34,12 +34,6 @@ from .models import (
 )
 
 ABSOLUTE_TOLERANCE = 1e-6
-_SUPPORTED_EQUALITIES = frozenset(
-    {
-        Constraint.EQUAL_TO_ZERO,
-        Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
-    }
-)
 
 
 class OMMXDA4Adapter(SamplerAdapter):
@@ -383,8 +377,12 @@ class OMMXDA4Adapter(SamplerAdapter):
 
     def _validate_constraints(self) -> None:
         """Validate regular constraints and reject infeasible constants."""
+        supported_equalities = {
+            Constraint.EQUAL_TO_ZERO,
+            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
+        }
         for constraint_id, constraint in self._ommx_instance.constraints.items():
-            if constraint.equality not in _SUPPORTED_EQUALITIES:
+            if constraint.equality not in supported_equalities:
                 raise AssertionError(
                     "Unsupported constraint equality reached after applicability "
                     f"validation: {constraint.equality} for constraint "
