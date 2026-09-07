@@ -672,6 +672,97 @@ def test_penalty_binary_polynomial_with_duplicates(instance_with_duplicates):
     )
 
 
+def test_equal_length_overlapping_one_hot_constraints_keep_first():
+    x = [DecisionVariable.binary(i) for i in range(3)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={},
+        one_hot_constraints={
+            1: OneHotConstraint(variables=[x[1], x[2]]),
+            0: OneHotConstraint(variables=[x[0], x[1]]),
+        },
+        sense=Sense.Minimize,
+    )
+    constraint_ids = list(instance.one_hot_constraints)
+    before = instance.to_v2_bytes()
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert instance.to_v2_bytes() == before
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [2]}
+    assert qubo_request.fujitsuDA3.internal_penalty == 1
+    reversed_variable_map = {v: k for k, v in adapter._variable_map.items()}
+    assert {reversed_variable_map[i] for i in range(2)} == set(
+        instance.one_hot_constraints[constraint_ids[0]].variables
+    )
+
+    assert qubo_request.penalty_binary_polynomial is not None
+    penalty_terms = [
+        BinaryPolynomialTerm(
+            c=term.c, p=sorted(reversed_variable_map[i] for i in term.p)
+        )
+        for term in qubo_request.penalty_binary_polynomial.terms
+    ]
+    variables = sorted(instance.one_hot_constraints[constraint_ids[1]].variables)
+    # (x_a + x_b - 1)^2 for the group not handled by DA4 internally.
+    assert sort_terms(penalty_terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=-1.0, p=[variables[0]]),
+            BinaryPolynomialTerm(c=-1.0, p=[variables[1]]),
+            BinaryPolynomialTerm(c=2.0, p=variables),
+        ]
+    )
+
+
+def test_overlapping_one_hot_constraints_use_greedy_selection():
+    x = [DecisionVariable.binary(i) for i in range(7)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={},
+        one_hot_constraints={
+            0: OneHotConstraint(variables=[x[0], x[1], x[2], x[3]]),
+            1: OneHotConstraint(variables=[x[0], x[4], x[5]]),
+            2: OneHotConstraint(variables=[x[4], x[6]]),
+        },
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert instance.to_v2_bytes() == before
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [4, 2]}
+    assert qubo_request.fujitsuDA3.internal_penalty == 1
+    reversed_variable_map = {v: k for k, v in adapter._variable_map.items()}
+    assert {reversed_variable_map[i] for i in range(4)} == {0, 1, 2, 3}
+    assert {reversed_variable_map[i] for i in range(4, 6)} == {4, 6}
+
+    assert qubo_request.penalty_binary_polynomial is not None
+    penalty_terms = [
+        BinaryPolynomialTerm(
+            c=term.c, p=sorted(reversed_variable_map[i] for i in term.p)
+        )
+        for term in qubo_request.penalty_binary_polynomial.terms
+    ]
+    # Only the rejected middle group contributes (x_0 + x_4 + x_5 - 1)^2.
+    assert sort_terms(penalty_terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=-1.0, p=[0]),
+            BinaryPolynomialTerm(c=-1.0, p=[4]),
+            BinaryPolynomialTerm(c=-1.0, p=[5]),
+            BinaryPolynomialTerm(c=2.0, p=[0, 4]),
+            BinaryPolynomialTerm(c=2.0, p=[0, 5]),
+            BinaryPolynomialTerm(c=2.0, p=[4, 5]),
+        ]
+    )
+
+
 def test_regular_constraint_is_not_skipped_when_id_matches_one_hot_constraint():
     x = [DecisionVariable.binary(id=i) for i in range(4)]
     constraint = x[0] == 1

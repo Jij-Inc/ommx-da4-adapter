@@ -1,6 +1,7 @@
 import pytest
 from ommx import (
     DecisionVariable,
+    Function,
     Instance,
     InstanceClassMismatch,
     Kind,
@@ -40,11 +41,86 @@ def test_input_class_accepts_complete_binary_polynomial_boundary(sense):
         one_hot_constraints={10: OneHotConstraint(variables=[x[0], x[3]])},
         sense=sense,
     )
+    before = instance.to_v2_bytes()
 
     report = OMMXDA4Adapter.check_applicability(instance)
+    OMMXDA4Adapter(instance)
 
     assert report.is_member
     assert report.matching_clauses == [(0, "da4-binary-polynomial-with-one-hot")]
+    assert instance.to_v2_bytes() == before
+
+
+def test_asserts_if_unsupported_variable_kind_reaches_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    x = DecisionVariable.integer(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=x,
+        constraints={},
+        sense=Sense.Minimize,
+    )
+    monkeypatch.setattr(
+        OMMXDA4Adapter,
+        "require_applicable",
+        lambda self, instance: None,
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="Unsupported decision variable kind reached after applicability validation",
+    ):
+        OMMXDA4Adapter(instance)
+
+
+def test_asserts_if_non_polynomial_objective_reaches_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    x = DecisionVariable.binary(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=abs(Function(x - 0.5)),
+        constraints={},
+        sense=Sense.Minimize,
+    )
+    monkeypatch.setattr(
+        OMMXDA4Adapter,
+        "require_applicable",
+        lambda self, instance: None,
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="Non-polynomial objective reached after applicability validation",
+    ):
+        OMMXDA4Adapter(instance)
+
+
+def test_asserts_if_non_polynomial_constraint_reaches_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    x = DecisionVariable.binary(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=0,
+        constraints={7: abs(Function(x - 0.5)) == 0},
+        sense=Sense.Minimize,
+    )
+    monkeypatch.setattr(
+        OMMXDA4Adapter,
+        "require_applicable",
+        lambda self, instance: None,
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match=(
+            "Non-polynomial constraint reached after applicability validation: "
+            "constraint 7"
+        ),
+    ):
+        OMMXDA4Adapter(instance)
 
 
 @pytest.mark.parametrize(
