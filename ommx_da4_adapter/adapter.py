@@ -34,6 +34,12 @@ from .models import (
 )
 
 ABSOLUTE_TOLERANCE = 1e-6
+_SUPPORTED_EQUALITIES = frozenset(
+    {
+        Constraint.EQUAL_TO_ZERO,
+        Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
+    }
+)
 
 
 class OMMXDA4Adapter(SamplerAdapter):
@@ -116,7 +122,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         self._ommx_instance = ommx_instance
         self._inequalities_lambda = inequalities_lambda
-        self._assert_supported_constraint_equalities()
+        self._assert_supported_constraints()
 
         (
             self._one_hot_dict,
@@ -375,19 +381,22 @@ class OMMXDA4Adapter(SamplerAdapter):
         sample_set = self.decode_to_sampleset(data)
         return sample_set.best_feasible
 
-    def _assert_supported_constraint_equalities(self) -> None:
+    def _assert_supported_constraints(self) -> None:
         """Assert that regular constraints match the declared input class."""
-        supported_equalities = {
-            Constraint.EQUAL_TO_ZERO,
-            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
-        }
         for constraint_id, constraint in self._ommx_instance.constraints.items():
-            if constraint.equality not in supported_equalities:
+            if constraint.equality not in _SUPPORTED_EQUALITIES:
                 raise AssertionError(
                     "Unsupported constraint equality reached after applicability "
                     f"validation: {constraint.equality} for constraint "
                     f"{constraint_id}. This may indicate an OMMX implementation "
                     "bug; please report it to OMMX."
+                )
+
+            if constraint.function.degree() is None:
+                raise AssertionError(
+                    "Non-polynomial constraint reached after applicability validation: "
+                    f"constraint {constraint_id}. This may indicate an OMMX "
+                    "implementation bug; please report it to OMMX."
                 )
 
     def _generate_binary_polynomial(self) -> BinaryPolynomial:
@@ -397,11 +406,19 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         instance = self._ommx_instance
 
+        objective = instance.objective
+        if objective.degree() is None:
+            raise AssertionError(
+                "Non-polynomial objective reached after applicability validation. "
+                "This may indicate an OMMX implementation bug; please report it to "
+                "OMMX."
+            )
+
         if instance.sense == Instance.MINIMIZE:
-            function = instance.objective
+            function = objective
         elif instance.sense == Instance.MAXIMIZE:
             # DA4 only supports minimization, so multiply the objective by -1.
-            function = -instance.objective
+            function = -objective
         else:
             raise AssertionError(
                 "Unsupported objective sense reached after applicability validation: "
