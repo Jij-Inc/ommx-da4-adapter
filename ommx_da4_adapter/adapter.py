@@ -122,7 +122,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         self._ommx_instance = ommx_instance
         self._inequalities_lambda = inequalities_lambda
-        self._assert_supported_constraints()
+        self._validate_constraints()
 
         (
             self._one_hot_dict,
@@ -381,8 +381,8 @@ class OMMXDA4Adapter(SamplerAdapter):
         sample_set = self.decode_to_sampleset(data)
         return sample_set.best_feasible
 
-    def _assert_supported_constraints(self) -> None:
-        """Assert that regular constraints match the declared input class."""
+    def _validate_constraints(self) -> None:
+        """Validate regular constraints and reject infeasible constants."""
         for constraint_id, constraint in self._ommx_instance.constraints.items():
             if constraint.equality not in _SUPPORTED_EQUALITIES:
                 raise AssertionError(
@@ -392,11 +392,20 @@ class OMMXDA4Adapter(SamplerAdapter):
                     "bug; please report it to OMMX."
                 )
 
-            if constraint.function.degree() is None:
+            constraint_degree = constraint.function.degree()
+            if constraint_degree is None:
                 raise AssertionError(
                     "Non-polynomial constraint reached after applicability validation: "
                     f"constraint {constraint_id}. This may indicate an OMMX "
                     "implementation bug; please report it to OMMX."
+                )
+
+            if (
+                constraint_degree == 0
+                and not constraint.evaluate({}, atol=ABSOLUTE_TOLERANCE).feasible
+            ):
+                raise OMMXDA4AdapterError(
+                    f"Infeasible constant constraint was found: id {constraint_id}"
                 )
 
     def _generate_binary_polynomial(self) -> BinaryPolynomial:
@@ -473,18 +482,14 @@ class OMMXDA4Adapter(SamplerAdapter):
                 squared_terms_dict.get(binary_key, 0.0) + value
             )
 
-        for constraint_id, constraint in instance.constraints.items():
+        for constraint in instance.constraints.values():
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
 
-            # Only constant case
+            # Feasible constant constraints were validated before conversion.
             if constraint.function.degree() == 0:
-                if constraint.evaluate({}, atol=ABSOLUTE_TOLERANCE).feasible:
-                    continue
-                raise OMMXDA4AdapterError(
-                    f"Infeasible constant constraint was found: id {constraint_id}"
-                )
+                continue
 
             function = constraint.function
             squared_function = function * function
@@ -529,13 +534,9 @@ class OMMXDA4Adapter(SamplerAdapter):
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 continue
 
-            # Only constant case
+            # Feasible constant constraints were validated before conversion.
             if constraint.function.degree() == 0:
-                if constraint.evaluate({}, atol=ABSOLUTE_TOLERANCE).feasible:
-                    continue
-                raise OMMXDA4AdapterError(
-                    f"Infeasible constant constraint was found: id {constraint_id}"
-                )
+                continue
 
             terms = constraint.function.terms
             inequalities_terms = [
