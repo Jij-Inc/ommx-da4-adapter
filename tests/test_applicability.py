@@ -51,6 +51,57 @@ def test_input_class_accepts_complete_binary_polynomial_boundary(sense):
     assert instance.to_v2_bytes() == before
 
 
+def test_accepts_unused_unsupported_variable_kind_without_mutating_input():
+    used = DecisionVariable.binary(0)
+    unused = DecisionVariable.integer(1)
+    instance = Instance.from_components(
+        decision_variables=[used, unused],
+        objective=used,
+        constraints={},
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    report = OMMXDA4Adapter.check_applicability(instance)
+    OMMXDA4Adapter(instance)
+
+    assert report.is_member
+    assert report.matching_clauses == [(0, "da4-binary-polynomial-with-one-hot")]
+    assert instance.to_v2_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("variable", "kind"),
+    [
+        (DecisionVariable.integer(0), Kind.Integer),
+        (DecisionVariable.continuous(0), Kind.Continuous),
+        (DecisionVariable.semi_integer(0, lower=1, upper=3), Kind.SemiInteger),
+        (
+            DecisionVariable.semi_continuous(0, lower=1, upper=3),
+            Kind.SemiContinuous,
+        ),
+    ],
+)
+def test_rejects_used_unsupported_variable_kinds(variable, kind):
+    instance = Instance.from_components(
+        decision_variables=[variable],
+        objective=variable,
+        constraints={},
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    with pytest.raises(AdapterNotApplicableError) as error:
+        OMMXDA4Adapter(instance)
+
+    [mismatch] = error.value.report.clause_reports[0].mismatches
+    assert isinstance(mismatch, InstanceClassMismatch.VariableKindNotAllowed)
+    assert mismatch.kind == kind
+    assert mismatch.variable_ids == {0}
+    assert mismatch.allowed_kinds == {Kind.Binary}
+    assert instance.to_v2_bytes() == before
+
+
 def test_asserts_if_unsupported_variable_kind_reaches_conversion(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -121,57 +172,6 @@ def test_asserts_if_non_polynomial_constraint_reaches_conversion(
         ),
     ):
         OMMXDA4Adapter(instance)
-
-
-@pytest.mark.parametrize(
-    ("variable", "kind"),
-    [
-        (DecisionVariable.integer(0), Kind.Integer),
-        (DecisionVariable.continuous(0), Kind.Continuous),
-        (DecisionVariable.semi_integer(0, lower=1, upper=3), Kind.SemiInteger),
-        (
-            DecisionVariable.semi_continuous(0, lower=1, upper=3),
-            Kind.SemiContinuous,
-        ),
-    ],
-)
-def test_rejects_used_unsupported_variable_kinds(variable, kind):
-    instance = Instance.from_components(
-        decision_variables=[variable],
-        objective=variable,
-        constraints={},
-        sense=Sense.Minimize,
-    )
-    before = instance.to_v2_bytes()
-
-    with pytest.raises(AdapterNotApplicableError) as error:
-        OMMXDA4Adapter(instance)
-
-    [mismatch] = error.value.report.clause_reports[0].mismatches
-    assert isinstance(mismatch, InstanceClassMismatch.VariableKindNotAllowed)
-    assert mismatch.kind == kind
-    assert mismatch.variable_ids == {0}
-    assert mismatch.allowed_kinds == {Kind.Binary}
-    assert instance.to_v2_bytes() == before
-
-
-def test_accepts_unused_unsupported_variable_kind_without_mutating_input():
-    used = DecisionVariable.binary(0)
-    unused = DecisionVariable.integer(1)
-    instance = Instance.from_components(
-        decision_variables=[used, unused],
-        objective=used,
-        constraints={},
-        sense=Sense.Minimize,
-    )
-    before = instance.to_v2_bytes()
-
-    report = OMMXDA4Adapter.check_applicability(instance)
-    OMMXDA4Adapter(instance)
-
-    assert report.is_member
-    assert report.matching_clauses == [(0, "da4-binary-polynomial-with-one-hot")]
-    assert instance.to_v2_bytes() == before
 
 
 def test_rejects_unsupported_special_constraints_without_mutating_input(

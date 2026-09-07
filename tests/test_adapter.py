@@ -2,12 +2,14 @@ import pytest
 from ommx import (
     Constraint,
     DecisionVariable,
+    Function,
     Instance,
     OneHotConstraint,
     Sense,
 )
 
 from ommx_da4_adapter import OMMXDA4Adapter
+from ommx_da4_adapter.adapter import ABSOLUTE_TOLERANCE
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
 from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse
 
@@ -436,6 +438,50 @@ def test_no_inequalities(instance_for_no_inequalities):
     assert qubo_request.inequalities is None
 
 
+def test_skips_feasible_constant_constraints():
+    x = DecisionVariable.binary(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=x,
+        constraints={
+            0: Function(ABSOLUTE_TOLERANCE / 2) == 0,
+            1: Function(-ABSOLUTE_TOLERANCE / 2) == 0,
+            2: Function(ABSOLUTE_TOLERANCE / 2) <= 0,
+            3: Function(-1) <= 0,
+        },
+        sense=Instance.MINIMIZE,
+    )
+
+    qubo_request = OMMXDA4Adapter(instance).sampler_input
+
+    assert qubo_request.penalty_binary_polynomial is None
+    assert qubo_request.inequalities is None
+
+
+@pytest.mark.parametrize(
+    "constraint",
+    [
+        Function(2 * ABSOLUTE_TOLERANCE) == 0,
+        Function(2 * ABSOLUTE_TOLERANCE) <= 0,
+    ],
+    ids=["equality", "less-than-or-equal"],
+)
+def test_rejects_infeasible_constant_constraint(constraint):
+    x = DecisionVariable.binary(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=x,
+        constraints={7: constraint},
+        sense=Instance.MINIMIZE,
+    )
+
+    with pytest.raises(
+        OMMXDA4AdapterError,
+        match="Infeasible constant constraint was found: id 7",
+    ):
+        OMMXDA4Adapter(instance)
+
+
 @pytest.fixture
 def instance_with_a_one_hot_constraint():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
@@ -497,6 +543,30 @@ def test_internal_penalty_with_a_one_hot_constraint(
     qubo_request = adapter.sampler_input
 
     assert qubo_request.fujitsuDA3.internal_penalty == 1
+
+
+def test_binary_polynomial_anchors_one_hot_group_start_index():
+    x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
+    # Keep the one-hot variables out of the objective to require the anchor.
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[3],
+        constraints={},
+        one_hot_constraints={0: OneHotConstraint(variables=[x[0], x[1], x[2]])},
+        sense=Instance.MINIMIZE,
+    )
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [3]}
+    assert qubo_request.binary_polynomial is not None
+    assert sort_terms(qubo_request.binary_polynomial.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=0.0, p=[0, 0]),
+            BinaryPolynomialTerm(c=1.0, p=[3]),
+        ]
+    )
 
 
 @pytest.fixture
@@ -1175,44 +1245,3 @@ def test_relax_constraint():
     )
     actual_inequality_terms = sort_terms(qubo_request.inequalities[0].terms)
     assert actual_inequality_terms == expected_inequality_terms
-
-
-def test_infeasible_constant_equality_constraint_raises_error():
-    x = DecisionVariable.binary(0)
-    instance = Instance.from_components(
-        decision_variables=[x],
-        objective=x,
-        # x - x + 1 == 0 is a constant constraint that never holds
-        constraints={0: x - x + 1 == 0},
-        sense=Instance.MINIMIZE,
-    )
-
-    with pytest.raises(
-        OMMXDA4AdapterError,
-        match="Infeasible constant constraint was found: id 0",
-    ):
-        OMMXDA4Adapter(instance)
-
-
-def test_binary_polynomial_anchors_one_hot_group_start_index():
-    x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
-    # Keep the one-hot variables out of the objective to require the anchor.
-    instance = Instance.from_components(
-        decision_variables=x,
-        objective=x[3],
-        constraints={},
-        one_hot_constraints={0: OneHotConstraint(variables=[x[0], x[1], x[2]])},
-        sense=Instance.MINIMIZE,
-    )
-
-    adapter = OMMXDA4Adapter(instance)
-    qubo_request = adapter.sampler_input
-
-    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [3]}
-    assert qubo_request.binary_polynomial is not None
-    assert sort_terms(qubo_request.binary_polynomial.terms) == sort_terms(
-        [
-            BinaryPolynomialTerm(c=0.0, p=[0, 0]),
-            BinaryPolynomialTerm(c=1.0, p=[3]),
-        ]
-    )
