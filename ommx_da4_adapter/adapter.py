@@ -5,10 +5,12 @@ from ommx import (
     Constraint,
     DecisionVariable,
     Equality,
+    Function,
     Instance,
     InstanceClass,
     InstanceClassClause,
     Kind,
+    Linear,
     PolynomialRequirement,
     PreparationPolicy,
     Samples,
@@ -480,6 +482,11 @@ class OMMXDA4Adapter(SamplerAdapter):
                 squared_terms_dict.get(binary_key, 0.0) + value
             )
 
+        def add_squared_terms(function: Function) -> None:
+            squared_function = function * function
+            for key, value in squared_function.terms.items():
+                add_term(key, value)
+
         for constraint in instance.constraints.values():
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
@@ -489,23 +496,20 @@ class OMMXDA4Adapter(SamplerAdapter):
             if constraint.function.degree() == 0:
                 continue
 
-            function = constraint.function
-            squared_function = function * function
-
-            for key, value in squared_function.terms.items():
-                add_term(key, value)
+            add_squared_terms(constraint.function)
 
         # DA4 one-way one-hot groups cannot share decision variables. Treat each
-        # overlapping group that is not passed to one_way_one_hot_groups as the
-        # regular equality sum(x_i) - 1 = 0. For binary variables, its square is
-        # 2 * sum_{i < j}(x_i * x_j) - sum_i(x_i) + 1.
+        # group not passed to one_way_one_hot_groups as the regular equality
+        # sum(x_i) - 1 = 0.
         for variables in self._penalty_one_hot_dict.values():
-            add_term((), 1.0)
-            for variable in variables:
-                add_term((variable,), -1.0)
-            for index, left in enumerate(variables):
-                for right in variables[index + 1 :]:
-                    add_term((left, right), 2.0)
+            add_squared_terms(
+                Function(
+                    Linear(
+                        terms={variable: 1.0 for variable in variables},
+                        constant=-1.0,
+                    )
+                )
+            )
 
         penalty_binary_polynomial_terms = [
             BinaryPolynomialTerm(
