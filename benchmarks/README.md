@@ -3,6 +3,10 @@
 固定seedからOMMX v2 Instanceを直接生成し、OMMX v3版と同じ問題を測定します。
 比較基準のOMMXは2.6.1へ固定します。
 
+## 測定結果
+
+- [2026年9月8日: OMMX 2.6.1 / 3.0.0b5、全294測定](benchmark-results-20260908-beta5.md)
+
 ## Instance
 
 | Instance | 目的関数・制約 | Formulation | 推奨サイズ |
