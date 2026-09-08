@@ -1,13 +1,17 @@
+import copy
 from typing import ClassVar, Literal
 
 from ommx import (
     Constraint,
-    DegreeBound,
+    DecisionVariable,
     Equality,
+    Function,
     Instance,
     InstanceClass,
     InstanceClassClause,
     Kind,
+    Linear,
+    PolynomialRequirement,
     PreparationPolicy,
     Samples,
     SampleSet,
@@ -31,22 +35,20 @@ from .models import (
     QuboResponse,
 )
 
-_UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS = {
-    Equality.EqualToZero: DegreeBound.unbounded(),
-    Equality.LessThanOrEqualToZero: DegreeBound.unbounded(),
-}
+ABSOLUTE_TOLERANCE = 1e-6
 
 
 class OMMXDA4Adapter(SamplerAdapter):
-    INPUT_CLASS: ClassVar[InstanceClass | None] = InstanceClass(
+    INPUT_CLASS: ClassVar[InstanceClass] = InstanceClass(
         [
             InstanceClassClause(
                 label="da4-binary-polynomial-with-one-hot",
                 allowed_variable_kinds={Kind.Binary},
-                objective_degree_bound=DegreeBound.unbounded(),
-                regular_constraint_degree_bounds=(
-                    _UNBOUNDED_REGULAR_CONSTRAINT_DEGREE_BOUNDS
-                ),
+                objective_polynomial_requirement=PolynomialRequirement.any_degree(),
+                regular_constraint_polynomial_requirements={
+                    Equality.EqualToZero: PolynomialRequirement.any_degree(),
+                    Equality.LessThanOrEqualToZero: PolynomialRequirement.any_degree(),
+                },
                 allows_one_hot=True,
                 allowed_senses={Sense.Minimize, Sense.Maximize},
             )
@@ -116,6 +118,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
         self._ommx_instance = ommx_instance
         self._inequalities_lambda = inequalities_lambda
+        self._validate_constraints()
 
         (
             self._one_hot_dict,
@@ -175,12 +178,67 @@ class OMMXDA4Adapter(SamplerAdapter):
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
     ) -> SampleSet:
-        """Sample the result in DA4 with DA4Client.
+        """Sample the given ommx.Instance using DA4Client, returning the samples
+        as an ommx.SampleSet.
 
-        :param ommx_instance: OMMX instance
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
+
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The ommx.Instance to prepare and sample.
         :param token: Authentication token for DA4 API. Defaults to None.
         :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
+        :return: SampleSet
+        """
+        prepared = copy.copy(ommx_instance)
+        prepared.prepare(
+            cls.INPUT_CLASS,
+            cls.recommended_preparation_policy(),
+        )
+        return cls.sample_without_preparation(
+            prepared,
+            token=token,
+            url=url,
+            version=version,
+            diagnostics=diagnostics,
+        )
+
+    @classmethod
+    def sample_without_preparation(
+        cls,
+        ommx_instance: Instance,
+        *,
+        token: str | None = None,
+        url: str = "https://api.aispf.global.fujitsu.com/da",
+        version: Literal["v4", "v3c"] = "v4",
+        diagnostics: DiagnosticsSink | None = None,
+    ) -> SampleSet:
+        """Sample an exact DA4 Adapter input without preparing it.
+
+        Use this method when the input instance has already been prepared,
+        possibly with a custom policy, or already belongs to ``INPUT_CLASS``.
+
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
+
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The exact DA4 Adapter input to sample.
+        :param token: Authentication token for DA4 API. Defaults to None.
+        :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
+        :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
         :return: SampleSet
         """
         if token is None:
@@ -188,6 +246,7 @@ class OMMXDA4Adapter(SamplerAdapter):
                 "token is required. Please set the token to use the DA4 API."
             )
 
+        # TODO: Update the diagnostics docstrings when support is implemented.
         _ = diagnostics
         adapter = cls(ommx_instance)
         qubo_request = adapter.sampler_input
@@ -206,22 +265,76 @@ class OMMXDA4Adapter(SamplerAdapter):
         version: Literal["v4", "v3c"] = "v4",
         diagnostics: DiagnosticsSink | None = None,
     ) -> Solution:
-        """Solve the result in DA4 with DA4Client.
+        """Solve the given ommx.Instance using DA4Client, returning the best
+        feasible solution as an ommx.Solution.
 
-        :param ommx_instance: OMMX instance
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
+
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The ommx.Instance to prepare and solve.
         :param token: Authentication token for DA4 API. Defaults to None.
         :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
         :return: Solution
         """
-        sample_set = cls.sample(
-            ommx_instance,
+        prepared = copy.copy(ommx_instance)
+        prepared.prepare(
+            cls.INPUT_CLASS,
+            cls.recommended_preparation_policy(),
+        )
+        return cls.solve_without_preparation(
+            prepared,
             token=token,
             url=url,
             version=version,
             diagnostics=diagnostics,
         )
-        return sample_set.best_feasible
+
+    @classmethod
+    def solve_without_preparation(
+        cls,
+        ommx_instance: Instance,
+        *,
+        token: str | None = None,
+        url: str = "https://api.aispf.global.fujitsu.com/da",
+        version: Literal["v4", "v3c"] = "v4",
+        diagnostics: DiagnosticsSink | None = None,
+    ) -> Solution:
+        """Solve an exact DA4 Adapter input without preparing it.
+
+        Use this method when the input instance has already been prepared,
+        possibly with a custom policy, or already belongs to ``INPUT_CLASS``.
+
+        ``diagnostics`` are not available through this Adapter.
+        The reserved ``diagnostics`` argument is accepted for compatibility with
+        the OMMX SamplerAdapter interface.
+
+        **NOTE** The ``token`` parameter *must* be passed to properly
+          instantiate the DA4Client. Using the default value will result in an
+          error.
+
+        :param ommx_instance: The exact DA4 Adapter input to solve.
+        :param token: Authentication token for DA4 API. Defaults to None.
+        :param url: URL to the Fujitsu Digital Annealer. Defaults to "https://api.aispf.global.fujitsu.com/da".
+        :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
+        :param diagnostics: Reserved for OMMX SamplerAdapter compatibility;
+          currently unused.
+        :return: Solution
+        """
+        return cls.sample_without_preparation(
+            ommx_instance,
+            token=token,
+            url=url,
+            version=version,
+            diagnostics=diagnostics,
+        ).best_feasible
 
     def decode_to_sampleset(self, data: QuboResponse) -> SampleSet:
         """Decode QuboResponse to SampleSet.
@@ -264,6 +377,37 @@ class OMMXDA4Adapter(SamplerAdapter):
         sample_set = self.decode_to_sampleset(data)
         return sample_set.best_feasible
 
+    def _validate_constraints(self) -> None:
+        """Validate regular constraints and reject infeasible constants."""
+        supported_equalities = {
+            Constraint.EQUAL_TO_ZERO,
+            Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
+        }
+        for constraint_id, constraint in self._ommx_instance.constraints.items():
+            if constraint.equality not in supported_equalities:
+                raise AssertionError(
+                    "Unsupported constraint equality reached after applicability "
+                    f"validation: {constraint.equality} for constraint "
+                    f"{constraint_id}. This may indicate an OMMX implementation "
+                    "bug; please report it to OMMX."
+                )
+
+            constraint_degree = constraint.function.degree()
+            if constraint_degree is None:
+                raise AssertionError(
+                    "Non-polynomial constraint reached after applicability validation: "
+                    f"constraint {constraint_id}. This may indicate an OMMX "
+                    "implementation bug; please report it to OMMX."
+                )
+
+            if (
+                constraint_degree == 0
+                and not constraint.evaluate({}, atol=ABSOLUTE_TOLERANCE).feasible
+            ):
+                raise OMMXDA4AdapterError(
+                    f"Infeasible constant constraint was found: id {constraint_id}"
+                )
+
     def _generate_binary_polynomial(self) -> BinaryPolynomial:
         """Generate BinaryPolynomial from OMMX instance."
 
@@ -271,11 +415,25 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         instance = self._ommx_instance
 
-        function = instance.objective
+        objective = instance.objective
+        if objective.degree() is None:
+            raise AssertionError(
+                "Non-polynomial objective reached after applicability validation. "
+                "This may indicate an OMMX implementation bug; please report it to "
+                "OMMX."
+            )
 
-        # if sense is maximize, multiply by -1 (DA4 only supports minimization)
-        if instance.sense == Instance.MAXIMIZE:
-            function = -instance.objective
+        if instance.sense == Sense.Minimize:
+            function = objective
+        elif instance.sense == Sense.Maximize:
+            # DA4 only supports minimization, so multiply the objective by -1.
+            function = -objective
+        else:
+            raise AssertionError(
+                "Unsupported objective sense reached after applicability validation: "
+                f"{instance.sense}. This may indicate an OMMX implementation bug; "
+                "please report it to OMMX."
+            )
 
         # get objective terms
         terms = function.terms
@@ -286,6 +444,15 @@ class OMMXDA4Adapter(SamplerAdapter):
             )
             for key, value in terms.items()
         ]
+
+        # DA4 starts one-way one-hot groups at the minimum polynomial variable
+        # and requires it as a quadratic term even with coefficient 0. This
+        # adapter maps native one-hot variables from 0, which the objective may omit.
+        # Example: one-hot on x0, x1, x2 (numbers=[3]), objective x3 + 2*x4
+        #   without this term: terms {p=[3], p=[4]}        -> group {3, 4, 5}
+        #   with this term:    terms {p=[0, 0], p=[3], p=[4]} -> group {0, 1, 2}
+        if self._one_hot_dict:
+            binary_polynomial_terms.append(BinaryPolynomialTerm(c=0.0, p=[0, 0]))
 
         return BinaryPolynomial(terms=binary_polynomial_terms)
 
@@ -315,28 +482,34 @@ class OMMXDA4Adapter(SamplerAdapter):
                 squared_terms_dict.get(binary_key, 0.0) + value
             )
 
+        def add_squared_terms(function: Function) -> None:
+            squared_function = function * function
+            for key, value in squared_function.terms.items():
+                add_term(key, value)
+
         for constraint in instance.constraints.values():
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
 
-            function = constraint.function
-            squared_function = function * function
+            # Feasible constant constraints were validated before conversion.
+            if constraint.function.degree() == 0:
+                continue
 
-            for key, value in squared_function.terms.items():
-                add_term(key, value)
+            add_squared_terms(constraint.function)
 
         # DA4 one-way one-hot groups cannot share decision variables. Treat each
-        # overlapping group that was not selected for native handling as the
-        # regular equality sum(x_i) - 1 = 0. For binary variables, its square is
-        # 2 * sum_{i < j}(x_i * x_j) - sum_i(x_i) + 1.
+        # group not passed to one_way_one_hot_groups as the regular equality
+        # sum(x_i) - 1 = 0.
         for variables in self._penalty_one_hot_dict.values():
-            add_term((), 1.0)
-            for variable in variables:
-                add_term((variable,), -1.0)
-            for index, left in enumerate(variables):
-                for right in variables[index + 1 :]:
-                    add_term((left, right), 2.0)
+            add_squared_terms(
+                Function(
+                    Linear(
+                        terms={variable: 1.0 for variable in variables},
+                        constant=-1.0,
+                    )
+                )
+            )
 
         penalty_binary_polynomial_terms = [
             BinaryPolynomialTerm(
@@ -361,6 +534,10 @@ class OMMXDA4Adapter(SamplerAdapter):
         for constraint_id, constraint in instance.constraints.items():
             # skip if not inequality constraints
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
+                continue
+
+            # Feasible constant constraints were validated before conversion.
+            if constraint.function.degree() == 0:
                 continue
 
             terms = constraint.function.terms
@@ -413,6 +590,13 @@ class OMMXDA4Adapter(SamplerAdapter):
                 variable_map[variable] = index
                 index += 1
         for decision_variable in instance.used_decision_variables:
+            if decision_variable.kind != DecisionVariable.BINARY:
+                raise AssertionError(
+                    "Unsupported decision variable kind reached after applicability "
+                    f"validation: {decision_variable.kind}. This may indicate an "
+                    "OMMX implementation bug; please report it to OMMX."
+                )
+
             # skip if already in variable_map
             if decision_variable.id in variable_map:
                 continue
@@ -449,7 +633,7 @@ class OMMXDA4Adapter(SamplerAdapter):
     def _partition_one_hot_constraints(
         self,
     ) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
-        """Partition one-hot constraints for native and penalty handling.
+        """Partition one-hot constraints into one_way_one_hot_groups and penalty handling.
 
         Examples:
         =========
@@ -465,8 +649,8 @@ class OMMXDA4Adapter(SamplerAdapter):
         penalty_one_hot_dict = {}
 
         case 2：duplicate decision variables
-        Prioritize longer constraints for native handling and send shorter ones
-        to penalty handling
+        Prioritize longer constraints for one_way_one_hot_groups and send shorter
+        ones to penalty handling
         constraint_1: id=0, x₀ + x₁ + x₂ = 1
         constraint_2: id=1, x₁ + x₃ = 1
         one_hot_dict = {

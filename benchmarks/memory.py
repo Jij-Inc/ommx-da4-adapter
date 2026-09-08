@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import gc
+import platform
+from importlib.metadata import version
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -33,11 +35,13 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--sample-count", type=int, default=16)
     args = parser.parse_args()
+    if args.sample_count < 1:
+        parser.error("sample-count must be at least 1")
 
     try:
         import memray  # pyright: ignore[reportMissingImports]
     except ImportError as error:
-        raise SystemExit("Run with `uv run --frozen --with memray`.") from error
+        raise SystemExit("Run with `uv run --frozen --group benchmark`.") from error
 
     try:
         instance = build_instance(
@@ -52,7 +56,6 @@ def main() -> None:
             args.operation,
             instance,
             args.instance,
-            args.size,
             args.sample_count,
             args.special_constraints,
             args.preparation,
@@ -87,7 +90,8 @@ def main() -> None:
 
     print(
         "operation,instance,formulation,special_constraints,preparation,size,"
-        "sample_count,first_peak_memory_bytes,peak_memory_bytes,ommx_version,"
+        "seed,sample_count,unique_solutions,python_version,memray_version,"
+        "first_peak_memory_bytes,peak_memory_bytes,ommx_version,"
         "pydantic_version,adapter_version"
     )
     print(
@@ -97,7 +101,11 @@ def main() -> None:
         args.special_constraints,
         args.preparation,
         args.size,
+        args.seed,
         args.sample_count,
+        1 if args.operation == "response-to-solution" else 0,
+        platform.python_version(),
+        version("memray"),
         first_peak_memory_bytes,
         peak_memory_bytes,
         *PACKAGE_VERSIONS,

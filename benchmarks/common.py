@@ -75,7 +75,10 @@ def build_instance(
         raise ValueError(
             "Preparation is available only for one-hot-preparation special constraints"
         )
-    return INSTANCE_BUILDERS[name](size, seed, formulation)
+    builder = INSTANCE_BUILDERS.get(name)
+    if builder is None:
+        raise ValueError(f"Unknown benchmark instance: {name}")
+    return builder(size, seed, formulation)
 
 
 def prepare_instance(instance: Instance) -> Instance:
@@ -94,13 +97,17 @@ def prepare_instance(instance: Instance) -> Instance:
 def build_response(
     adapter: OMMXDA4Adapter,
     name: str,
-    size: int,
     sample_count: int,
 ) -> QuboResponse:
     """Build a deterministic feasible DA4 response outside the measured call."""
     if sample_count < 1:
         raise ValueError("sample-count must be at least 1")
-    entries = build_feasible_entries(name, size)
+    entries = build_feasible_entries(name, adapter._ommx_instance)
+    evaluation = adapter._ommx_instance.evaluate(entries)
+    if not evaluation.feasible:
+        raise ValueError(f"Synthetic benchmark response is not feasible for {name}")
+    if set(entries) != set(adapter._variable_map):
+        raise ValueError("Synthetic response variables do not match the DA4 request")
     configuration = {
         str(adapter._variable_map[variable_id]): bool(value)
         for variable_id, value in entries.items()
@@ -127,12 +134,13 @@ def make_benchmark_operation(
     operation: str,
     instance: Instance,
     instance_name: str,
-    size: int,
     sample_count: int,
     special_constraints: str,
     preparation: str,
 ) -> BenchmarkOperation:
     """Prepare everything outside the measured operation."""
+    if operation not in ("prepare", "instance-to-request", "response-to-solution"):
+        raise ValueError(f"Unknown benchmark operation: {operation}")
     if operation == "prepare":
         if special_constraints == "none" or preparation != "recommended":
             raise ValueError(
@@ -166,7 +174,7 @@ def make_benchmark_operation(
         )
 
     adapter = OMMXDA4Adapter(adapter_instance)
-    response = build_response(adapter, instance_name, size, sample_count)
+    response = build_response(adapter, instance_name, sample_count)
     return BenchmarkOperation(
         setup=lambda: response,
         run=lambda target: adapter.decode(target),
