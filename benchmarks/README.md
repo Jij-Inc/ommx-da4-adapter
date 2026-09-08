@@ -5,6 +5,7 @@
 
 ## 測定結果
 
+- [2026年9月8日: OMMX 2.6.1 / 3.0.0b5、全294測定](benchmark-results-20260908-beta5.md)
 - [2026年8月25日: OMMX v2/v3比較（Preparation workload整合前）](benchmark-results-20260825.md)
 
 ## Instance

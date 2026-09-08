@@ -162,7 +162,9 @@ def main() -> None:
                             f"Expected one CSV result for {case}: {result.stdout}"
                         )
                     if writer is None:
-                        writer = csv.DictWriter(output, fieldnames=reader.fieldnames)
+                        writer = csv.DictWriter(
+                            output, fieldnames=reader.fieldnames, lineterminator="\n"
+                        )
                         writer.writeheader()
                     writer.writerow(rows[0])
                     output.flush()
