@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import gc
+import platform
 import statistics
 import time
 
@@ -33,6 +34,11 @@ def main() -> None:
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--repeat", type=int, default=20)
     args = parser.parse_args()
+    if args.sample_count < 1:
+        parser.error("sample-count must be at least 1")
+
+    if args.warmup < 0 or args.repeat < 1:
+        parser.error("warmup must be nonnegative and repeat must be at least 1")
 
     try:
         instance = build_instance(
@@ -47,7 +53,6 @@ def main() -> None:
             args.operation,
             instance,
             args.instance,
-            args.size,
             args.sample_count,
         )
     except ValueError as error:
@@ -55,7 +60,8 @@ def main() -> None:
 
     print(
         "operation,instance,formulation,special_constraints,preparation,size,"
-        "sample_count,first_seconds,median_seconds,ommx_version,pydantic_version,"
+        "seed,sample_count,unique_solutions,warmup,repeat,python_version,"
+        "first_seconds,median_seconds,ommx_version,pydantic_version,"
         "adapter_version"
     )
 
@@ -102,7 +108,12 @@ def main() -> None:
         args.special_constraints,
         args.preparation,
         args.size,
+        args.seed,
         args.sample_count,
+        1 if args.operation == "response-to-solution" else 0,
+        args.warmup,
+        args.repeat,
+        platform.python_version(),
         f"{first_seconds:.9f}",
         f"{statistics.median(samples):.9f}",
         *PACKAGE_VERSIONS,

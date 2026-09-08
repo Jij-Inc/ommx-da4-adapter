@@ -113,7 +113,7 @@ def test_one_hot_preparation_special_workload_preserves_feasibility_and_objectiv
 def test_synthetic_response_decodes_to_a_feasible_solution():
     size = 3
     adapter = OMMXDA4Adapter(build_tsp_instance(size, formulation="one-hot"))
-    response = build_response(adapter, "tsp", size, sample_count=4)
+    response = build_response(adapter, "tsp", sample_count=4)
 
     solution = adapter.decode(response)
 

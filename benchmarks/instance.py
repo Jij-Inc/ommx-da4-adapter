@@ -342,24 +342,22 @@ def build_one_hot_preparation_instance(
     )
 
 
-def build_feasible_entries(name: str, size: int) -> dict[int, int]:
-    """Return one deterministic feasible state for a benchmark Instance."""
+def build_feasible_entries(name: str, instance: Instance) -> dict[int, int]:
+    """Construct a feasible state using variable metadata, independent of IDs."""
+    variables = instance.decision_variables
+    entries = {variable.id: 0 for variable in variables}
     if name == "knapsack":
-        return {i: 0 for i in range(size)}
+        return entries
     if name in ("assignment", "tsp"):
         return {
-            row * size + column: int(row == column)
-            for row in range(size)
-            for column in range(size)
+            variable.id: int(variable.subscripts[0] == variable.subscripts[1])
+            for variable in variables
         }
     if name == "clique":
-        clique_size = (size + 1) // 2
-        first_clique_vertex = size - clique_size
-        return {i: int(i >= first_clique_vertex) for i in range(size)}
+        ordered = sorted(variables, key=lambda variable: variable.subscripts[0])
+        clique_size = (len(ordered) + 1) // 2
+        entries.update({variable.id: 1 for variable in ordered[-clique_size:]})
+        return entries
     if name == "one-hot-preparation":
-        return {
-            group * size + choice: int(choice == 0)
-            for group in range(size)
-            for choice in range(size)
-        }
+        return {variable.id: int(variable.subscripts[1] == 0) for variable in variables}
     raise ValueError(f"Unknown Instance: {name}")

@@ -42,3 +42,6 @@ version_file = "./ommx_da4_adapter/_version.py"
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[dependency-groups]
+benchmark = ["memray==1.20.0"]
