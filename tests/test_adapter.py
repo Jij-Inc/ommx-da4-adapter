@@ -426,12 +426,13 @@ def instance_for_MAXIMIZE():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraint = x_1 * x_2 == 0
+    equality = x_1 * x_2 == 0
+    inequality = x_1 + x_2 <= 1
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints={0: constraint},
+        constraints={0: equality, 1: inequality},
         sense=Sense.Maximize,
     )
 
@@ -450,6 +451,31 @@ def test_binary_polynomial_for_MAXIMIZE(instance_for_MAXIMIZE):
         [
             BinaryPolynomialTerm(c=-1.0, p=[0]),
             BinaryPolynomialTerm(c=-1.0, p=[1]),
+        ]
+    )
+
+
+def test_penalty_binary_polynomial_for_MAXIMIZE(instance_for_MAXIMIZE):
+    adapter = OMMXDA4Adapter(instance_for_MAXIMIZE)
+    penalty = adapter.sampler_input.penalty_binary_polynomial
+
+    # (x₁x₂)² = x₁x₂ for binary variables; the penalty stays positive.
+    assert penalty is not None
+    assert penalty.terms == [BinaryPolynomialTerm(c=1.0, p=[0, 1])]
+
+
+def test_inequalities_for_MAXIMIZE(instance_for_MAXIMIZE):
+    adapter = OMMXDA4Adapter(instance_for_MAXIMIZE)
+    inequalities = adapter.sampler_input.inequalities
+
+    # x₁ + x₂ - 1 <= 0 keeps its coefficients when maximizing.
+    assert inequalities is not None
+    [inequality] = inequalities
+    assert sort_terms(inequality.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=-1.0, p=[]),
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
         ]
     )
 
