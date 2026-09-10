@@ -13,7 +13,7 @@ from benchmarks.instance import (
     build_one_hot_preparation_instance,
     build_tsp_instance,
 )
-from ommx_da4_adapter import OMMXDA4Adapter
+from ommx_da4_adapter import OMMXDA4Adapter, OMMXDA4AdapterError
 
 
 @pytest.mark.parametrize(
@@ -24,7 +24,6 @@ from ommx_da4_adapter import OMMXDA4Adapter
         (build_assignment_instance, 3, "one-hot"),
         (build_tsp_instance, 3, "regular"),
         (build_tsp_instance, 3, "one-hot"),
-        (build_clique_instance, 4, "regular"),
     ],
 )
 def test_benchmark_instances_are_accepted(builder, size, formulation) -> None:
@@ -32,6 +31,17 @@ def test_benchmark_instances_are_accepted(builder, size, formulation) -> None:
 
     assert OMMXDA4Adapter.check_applicability(instance).is_member
     OMMXDA4Adapter(instance)
+
+
+@pytest.mark.parametrize("size", [10, 20, 30])
+def test_clique_benchmark_is_rejected_after_squaring(size: int) -> None:
+    instance = build_clique_instance(size=size, seed=0, formulation="regular")
+
+    # The quadratic equality includes products for two disjoint edges.
+    # Squaring produces a nonzero quartic term in four distinct variables,
+    # so binary simplification cannot reduce it to degree two.
+    with pytest.raises(OMMXDA4AdapterError, match="Penalty polynomial degree 4"):
+        OMMXDA4Adapter(instance)
 
 
 def test_overlapping_one_hot_benchmark_exercises_both_da4_paths() -> None:

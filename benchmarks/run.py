@@ -28,7 +28,6 @@ def benchmark_cases() -> list[Case]:
             ("knapsack", (100, 400, 900), ("regular",)),
             ("assignment", (10, 20, 30), ("regular", "one-hot")),
             ("tsp", (10, 20, 30), ("regular", "one-hot")),
-            ("clique", (10, 20, 30), ("regular",)),
         ):
             for formulation in formulations:
                 for size in sizes:

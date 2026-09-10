@@ -1,12 +1,14 @@
 # DA4 adapter conversion benchmarks (OMMX v3)
 
-固定seedからOMMX v3 Instanceを直接生成し、`inspect_ommx_v2`と同じ問題を測定します。
-`update_ommx_v3`のコミット`7808a6f`を取り込み、OMMX 3.0.0b5で検証します。
+固定seedからOMMX v3 Instanceを直接生成し、`inspect_ommx_v2`と共通の問題を測定します。
+`update_ommx_v3`のコミット`510b7d0`を取り込み、OMMX 3.0.0b5で検証します。
 
 ## 測定結果
 
 - [2026年9月8日: OMMX 2.6.1 / 3.0.0b5、全294測定](benchmark-results-20260908-beta5.md)
 - [2026年8月25日: OMMX v2/v3比較（Preparation workload整合前）](benchmark-results-20260825.md)
+
+上記は次数検証の追加前に取得した結果です。`510b7d0`取り込み後の再測定は未実施です。
 
 ## Instance
 
@@ -15,8 +17,11 @@
 | `knapsack` | Binary線形目的関数と不等式 | `regular` | 100 / 400 / 900 |
 | `assignment` | Binary線形目的関数と重複OneHot | `regular` / `one-hot` | 10 / 20 / 30 |
 | `tsp` | Binary 2次目的関数と重複OneHot | `regular` / `one-hot` | 10 / 20 / 30 |
-| `clique` | 1次・2次等式のペナルティ化 | `regular` | 10 / 20 / 30 |
 | `one-hot-preparation` | Indicator/SOS1のPreparation | `one-hot` | 10 / 20 / 30 |
+
+既存の`clique`は、サイズ10 / 20 / 30・seed 0で2次等式の2乗後に4次項が残り、
+DA4の次数上限を超えるため、全件測定の対象から除外しています。
+生成関数は残していますが、Adapterへの変換時に`OMMXDA4AdapterError`になります。
 
 v3では通常制約とfirst-classな`OneHotConstraint`を別々に生成します。
 `assignment`と`tsp`では行方向と列方向のOneHotが変数を共有します。変数数が同じ場合は
@@ -92,15 +97,15 @@ v2/v3の同値性確認では変数IDの対応を戻し、ゼロ係数項を除�
 
 | Operation | 通常問題 | Preparation比較用 | 合計 |
 | --- | ---: | ---: | ---: |
-| `instance-to-request` | 18 | 21 | 39 |
-| `response-to-solution` | 18 | 21 | 39 |
+| `instance-to-request` | 15 | 21 | 36 |
+| `response-to-solution` | 15 | 21 | 36 |
 | `prepare` | 0 | 9 | 9 |
-| 合計 | 36 | 51 | 87 |
+| 合計 | 30 | 51 | 81 |
 
-時間87条件＋メモリ87条件＝174測定です。比較用21条件はOneHotのみの
+時間81条件＋メモリ81条件＝162測定です。比較用21条件はOneHotのみの
 baseline 3サイズ＋特殊制約3種 × direct/prepared × 3サイズです。
 `prepare`はlowering対象がある3種 × 3サイズのみを測定します。
-両ブランチを合わせて294測定になります。
+v2/v3の比較には、両ブランチに共通するClique以外の条件を使用します。
 
 ## 時間
 

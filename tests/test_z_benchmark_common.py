@@ -81,10 +81,10 @@ def test_matrix_covers_each_comparison_once():
     cases = benchmark_cases()
     assert len(cases) == len(set(cases))
     if "recommended" in PREPARATIONS:
-        assert len(cases) == 87
+        assert len(cases) == 81
         assert sum(case[0] == "prepare" for case in cases) == 9
     else:
-        assert len(cases) == 60
+        assert len(cases) == 54
         assert all(case[0] != "prepare" for case in cases)
     for case in cases:
         operation, name, formulation, special, preparation, size = case
