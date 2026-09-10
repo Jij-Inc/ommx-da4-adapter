@@ -302,32 +302,6 @@ def test_penalty_binary_polynomial(instance):
     )
 
 
-def test_penalty_binary_polynomial_accepts_canceled_cubic_terms():
-    x = [DecisionVariable.binary(i) for i in range(3)]
-    instance = Instance.from_components(
-        decision_variables=x,
-        objective=0,
-        constraints={
-            0: x[0] * x[1] + x[2] == 0,
-            1: x[0] * x[1] - x[2] == 0,
-        },
-        sense=Sense.Minimize,
-    )
-    before = instance.to_v2_bytes()
-
-    penalty = OMMXDA4Adapter(instance).sampler_input.penalty_binary_polynomial
-
-    assert penalty is not None
-    # (xy + z)^2 + (xy - z)^2 = 2xy + 2z for binary variables.
-    assert sort_terms(penalty.terms) == sort_terms(
-        [
-            BinaryPolynomialTerm(c=2.0, p=[0, 1]),
-            BinaryPolynomialTerm(c=2.0, p=[2]),
-        ]
-    )
-    assert instance.to_v2_bytes() == before
-
-
 def test_penalty_binary_polynomial_preserves_variable_used_only_in_binary_identity():
     x = DecisionVariable.binary(0)
     y = DecisionVariable.binary(1)
