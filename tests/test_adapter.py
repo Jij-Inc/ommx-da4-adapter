@@ -164,17 +164,17 @@ def instance():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
     x_3 = DecisionVariable.binary(id=2, name="x_3")
 
-    # objective: 2x₁x₂x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
-    # constraint_equality_1: x₁x₂x₃ == 0
-    # constraint_equality_2: 3x₁x₂x₃ + 2x₁ + 5 == 0
-    # constraint_inequality_1: 4x₁x₂x₃ ≤ 0
-    # constraint_inequality_2: x₁x₂x₃ + 2x₃ + 3 ≤ 0
+    # objective: 2x₁x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
+    # constraint_equality_1: x₁x₂ == 0
+    # constraint_equality_2: 3x₁x₂ + 2x₁ + 5 == 0
+    # constraint_inequality_1: 4x₁ ≤ 0
+    # constraint_inequality_2: x₁ + 2x₃ + 3 ≤ 0
 
-    objective = 2 * x_1 * x_2 * x_3 + 3 * x_1 * x_2 + 4 * x_1 + 5 * x_2 + 6 * x_3 + 6
-    constraint_equality_1 = x_1 * x_2 * x_3 == 0
-    constraint_equality_2 = 3 * x_1 * x_2 * x_3 + 2 * x_1 + 5 == 0
-    constraint_inequality_1 = 4 * x_1 * x_2 * x_3 <= 0
-    constraint_inequality_2 = x_1 * x_2 * x_3 + 2 * x_3 + 3 <= 0
+    objective = 2 * x_1 * x_3 + 3 * x_1 * x_2 + 4 * x_1 + 5 * x_2 + 6 * x_3 + 6
+    constraint_equality_1 = x_1 * x_2 == 0
+    constraint_equality_2 = 3 * x_1 * x_2 + 2 * x_1 + 5 == 0
+    constraint_inequality_1 = 4 * x_1 <= 0
+    constraint_inequality_2 = x_1 + 2 * x_3 + 3 <= 0
 
     assert isinstance(constraint_inequality_1, Constraint)
     assert isinstance(constraint_inequality_2, Constraint)
@@ -270,7 +270,7 @@ def test_binary_polynomial(instance):
     qubo_request = adapter.sampler_input
 
     # assert with manually calculated values
-    # 2x₁x₂x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
+    # 2x₁x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
     assert qubo_request.binary_polynomial is not None and sort_terms(
         qubo_request.binary_polynomial.terms
     ) == sort_terms(
@@ -278,7 +278,7 @@ def test_binary_polynomial(instance):
             BinaryPolynomialTerm(c=6.0, p=[]),
             BinaryPolynomialTerm(c=4.0, p=[0]),
             BinaryPolynomialTerm(c=3.0, p=[0, 1]),
-            BinaryPolynomialTerm(c=2.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=2.0, p=[0, 2]),
             BinaryPolynomialTerm(c=5.0, p=[1]),
             BinaryPolynomialTerm(c=6.0, p=[2]),
         ]
@@ -290,12 +290,12 @@ def test_penalty_binary_polynomial(instance):
     qubo_request = adapter.sampler_input
 
     # assert with manually calculated values
-    # 52y₁y₂y₃ + 24y₁ + 25
+    # 52y₁y₂ + 24y₁ + 25
     assert qubo_request.penalty_binary_polynomial is not None and sort_terms(
         qubo_request.penalty_binary_polynomial.terms
     ) == sort_terms(
         [
-            BinaryPolynomialTerm(c=52.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=52.0, p=[0, 1]),
             BinaryPolynomialTerm(c=24.0, p=[0]),
             BinaryPolynomialTerm(c=25.0, p=[]),
         ]
@@ -337,18 +337,18 @@ def test_inequalities(instance):
     qubo_request = adapter.sampler_input
 
     # assert with manually calculated values
-    # 4x₁x₂x₃ ≤ 0
-    # x₁x₂x₃ + 2x₃ + 3 ≤ 0
+    # 4x₁ ≤ 0
+    # x₁ + 2x₃ + 3 ≤ 0
     assert qubo_request.inequalities is not None
     assert sort_terms(qubo_request.inequalities[0].terms) == sort_terms(
         [
-            BinaryPolynomialTerm(c=4.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=4.0, p=[0]),
         ]
     )
     assert sort_terms(qubo_request.inequalities[1].terms) == sort_terms(
         [
             BinaryPolynomialTerm(c=3.0, p=[]),
-            BinaryPolynomialTerm(c=1.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=2.0, p=[2]),
         ]
     )
@@ -394,7 +394,7 @@ def instance_for_no_penalty_binary_polynomial():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraint = x_1 * x_2 <= 0
+    constraint = x_1 + x_2 <= 1
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],

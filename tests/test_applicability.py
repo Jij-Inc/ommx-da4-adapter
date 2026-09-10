@@ -1,6 +1,7 @@
 import pytest
 from ommx import (
     DecisionVariable,
+    Equality,
     Function,
     Instance,
     InstanceClassMismatch,
@@ -29,14 +30,14 @@ def instance_with_unsupported_special_constraints() -> Instance:
 
 
 @pytest.mark.parametrize("sense", [Sense.Minimize, Sense.Maximize])
-def test_input_class_accepts_complete_binary_polynomial_boundary(sense):
+def test_input_class_accepts_binary_quadratic_boundary(sense):
     x = [DecisionVariable.binary(i) for i in range(4)]
     instance = Instance.from_components(
         decision_variables=x,
-        objective=x[0] * x[1] * x[2] * x[3],
+        objective=x[0] * x[1] + x[2] * x[3],
         constraints={
-            0: x[0] * x[1] * x[2] == 0,
-            1: x[1] * x[2] <= 1,
+            0: x[0] * x[1] == 0,
+            1: x[1] + x[2] <= 1,
         },
         one_hot_constraints={10: OneHotConstraint(variables=[x[0], x[3]])},
         sense=sense,
@@ -48,6 +49,60 @@ def test_input_class_accepts_complete_binary_polynomial_boundary(sense):
 
     assert report.is_member
     assert report.matching_clauses == [(0, "da4-binary-polynomial-with-one-hot")]
+    assert instance.to_v2_bytes() == before
+
+
+def test_rejects_cubic_objective_without_mutating_input():
+    x = [DecisionVariable.binary(i) for i in range(3)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[0] * x[1] * x[2],
+        constraints={},
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    with pytest.raises(AdapterNotApplicableError) as error:
+        OMMXDA4Adapter(instance)
+
+    [mismatch] = error.value.report.clause_reports[0].mismatches
+    assert isinstance(mismatch, InstanceClassMismatch.ObjectiveDegreeExceedsBound)
+    assert mismatch.actual_degree == 3
+    assert mismatch.bound.maximum_degree == 2
+    assert instance.to_v2_bytes() == before
+
+
+@pytest.mark.parametrize(
+    ("relation", "maximum_degree"),
+    [(Equality.EqualToZero, 2), (Equality.LessThanOrEqualToZero, 1)],
+)
+def test_rejects_constraint_above_degree_bound_without_mutating_input(
+    relation, maximum_degree
+):
+    x = [DecisionVariable.binary(i) for i in range(3)]
+    constraint = (
+        x[0] * x[1] * x[2] == 0
+        if relation == Equality.EqualToZero
+        else x[0] * x[1] <= 0
+    )
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=sum(x),
+        constraints={0: constraint},
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    with pytest.raises(AdapterNotApplicableError) as error:
+        OMMXDA4Adapter(instance)
+
+    [mismatch] = error.value.report.clause_reports[0].mismatches
+    assert isinstance(
+        mismatch, InstanceClassMismatch.RegularConstraintDegreeExceedsBound
+    )
+    assert mismatch.relation == relation
+    assert mismatch.actual_degrees == {0: maximum_degree + 1}
+    assert mismatch.bound.maximum_degree == maximum_degree
     assert instance.to_v2_bytes() == before
 
 

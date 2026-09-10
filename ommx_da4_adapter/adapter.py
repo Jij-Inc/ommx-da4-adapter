@@ -44,10 +44,10 @@ class OMMXDA4Adapter(SamplerAdapter):
             InstanceClassClause(
                 label="da4-binary-polynomial-with-one-hot",
                 allowed_variable_kinds={Kind.Binary},
-                objective_polynomial_requirement=PolynomialRequirement.any_degree(),
+                objective_polynomial_requirement=PolynomialRequirement.at_most(2),
                 regular_constraint_polynomial_requirements={
-                    Equality.EqualToZero: PolynomialRequirement.any_degree(),
-                    Equality.LessThanOrEqualToZero: PolynomialRequirement.any_degree(),
+                    Equality.EqualToZero: PolynomialRequirement.at_most(2),
+                    Equality.LessThanOrEqualToZero: PolynomialRequirement.at_most(1),
                 },
                 allows_one_hot=True,
                 allowed_senses={Sense.Minimize, Sense.Maximize},
