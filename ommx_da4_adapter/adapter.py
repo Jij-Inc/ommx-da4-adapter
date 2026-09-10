@@ -46,6 +46,10 @@ class OMMXDA4Adapter(SamplerAdapter):
                 allowed_variable_kinds={Kind.Binary},
                 objective_polynomial_requirement=PolynomialRequirement.at_most(2),
                 regular_constraint_polynomial_requirements={
+                    # Some quadratic equalities yield quadratic penalties after
+                    # squaring and binary simplification, e.g. xy = 0: (xy)^2 = xy.
+                    # _generate_penalty_binary_polynomial() checks the final degree
+                    # after squaring, binary simplification, and aggregation.
                     Equality.EqualToZero: PolynomialRequirement.at_most(2),
                     Equality.LessThanOrEqualToZero: PolynomialRequirement.at_most(1),
                 },
@@ -511,11 +515,27 @@ class OMMXDA4Adapter(SamplerAdapter):
                 )
             )
 
+        # Check the final degree after squaring, binary simplification, and aggregation.
+        # Ignore exactly zero coefficients when checking the degree.
+        penalty_degree = max(
+            (len(key) for key, value in squared_terms_dict.items() if value != 0.0),
+            default=0,
+        )
+        if penalty_degree > 2:
+            raise OMMXDA4AdapterError(
+                f"Penalty polynomial degree {penalty_degree} exceeds DA4's "
+                "maximum supported degree of 2 after squaring, binary "
+                "simplification, and aggregation."
+            )
+
+        # Keep zero coefficients in linear and quadratic terms to retain variables.
+        # Any remaining higher-degree terms have zero coefficients after validation.
         penalty_binary_polynomial_terms = [
             BinaryPolynomialTerm(
                 c=value, p=self._replace_polynomials_with_variable_map(key)
             )
             for key, value in squared_terms_dict.items()
+            if len(key) <= 2
         ]
 
         if len(penalty_binary_polynomial_terms) == 0:

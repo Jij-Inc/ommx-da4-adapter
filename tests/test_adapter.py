@@ -302,6 +302,98 @@ def test_penalty_binary_polynomial(instance):
     )
 
 
+def test_penalty_binary_polynomial_accepts_canceled_cubic_terms():
+    x = [DecisionVariable.binary(i) for i in range(3)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={
+            0: x[0] * x[1] + x[2] == 0,
+            1: x[0] * x[1] - x[2] == 0,
+        },
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    penalty = OMMXDA4Adapter(instance).sampler_input.penalty_binary_polynomial
+
+    assert penalty is not None
+    # (xy + z)^2 + (xy - z)^2 = 2xy + 2z for binary variables.
+    assert sort_terms(penalty.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=2.0, p=[0, 1]),
+            BinaryPolynomialTerm(c=2.0, p=[2]),
+        ]
+    )
+    assert instance.to_v2_bytes() == before
+
+
+def test_penalty_binary_polynomial_preserves_variable_used_only_in_binary_identity():
+    x = DecisionVariable.binary(0)
+    y = DecisionVariable.binary(1)
+    instance = Instance.from_components(
+        decision_variables=[x, y],
+        objective=x,
+        constraints={0: y * y - y == 0},
+        sense=Sense.Minimize,
+    )
+
+    penalty = OMMXDA4Adapter(instance).sampler_input.penalty_binary_polynomial
+
+    # The identity contributes no energy, but y must still reach DA4.
+    assert penalty is not None
+    assert penalty.terms == [BinaryPolynomialTerm(c=0.0, p=[1])]
+
+
+def test_penalty_binary_polynomial_preserves_variable_in_canceled_quadratic_term():
+    x = DecisionVariable.binary(0)
+    y = DecisionVariable.binary(1)
+    instance = Instance.from_components(
+        decision_variables=[x, y],
+        objective=x,
+        constraints={0: x * y == 0, 1: x * y - x == 0},
+        sense=Sense.Minimize,
+    )
+
+    penalty = OMMXDA4Adapter(instance).sampler_input.penalty_binary_polynomial
+
+    # (xy)^2 + (xy - x)^2 = x + 0xy; retain the only term containing y.
+    assert penalty is not None
+    assert sort_terms(penalty.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=0.0, p=[0, 1]),
+        ]
+    )
+
+
+@pytest.mark.parametrize("degree", [3, 4])
+@pytest.mark.parametrize("coefficient", [1.0, 2**-22], ids=["unit", "small"])
+def test_rejects_non_quadratic_penalty(degree, coefficient):
+    x = [DecisionVariable.binary(i) for i in range(degree)]
+    # Squaring produces the following cross terms (a = coefficient):
+    # degree=3: 2a(x₀x₁)(x₁x₂) = 2ax₀x₁x₂ after binary simplification.
+    # degree=4: 2a(x₀x₁)(x₂x₃) = 2ax₀x₁x₂x₃.
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={
+            0: coefficient * x[0] * x[1] + x[-2] * x[-1] - 1 == 0,
+        },
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    assert OMMXDA4Adapter.check_applicability(instance).is_member
+    with pytest.raises(
+        OMMXDA4AdapterError,
+        match=f"Penalty polynomial degree {degree} exceeds DA4's maximum supported degree of 2",
+    ):
+        OMMXDA4Adapter(instance)
+
+    assert instance.to_v2_bytes() == before
+
+
 def test_inequalities_lambda_default(instance):
     adapter = OMMXDA4Adapter(instance, inequalities_lambda={})
     qubo_request = adapter.sampler_input
@@ -738,6 +830,37 @@ def test_penalty_binary_polynomial_with_duplicates(instance_with_duplicates):
             BinaryPolynomialTerm(c=2.0, p=[3, 0]),
             BinaryPolynomialTerm(c=-1.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[]),
+        ]
+    )
+
+
+def test_penalty_binary_polynomial_preserves_terms_canceled_by_one_hot():
+    x = [DecisionVariable.binary(i) for i in range(4)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={0: x[0] + x[1] == 0},
+        one_hot_constraints={
+            0: OneHotConstraint(variables=[x[0], x[1]]),
+            1: OneHotConstraint(variables=[x[1], x[2], x[3]]),
+        },
+        sense=Sense.Minimize,
+    )
+
+    adapter = OMMXDA4Adapter(instance)
+    penalty = adapter.sampler_input.penalty_binary_polynomial
+
+    assert adapter._penalty_one_hot_dict == {0: [0, 1]}
+    assert penalty is not None
+    # (x_0 + x_1)^2 + (x_0 + x_1 - 1)^2 = 4x_0x_1 + 1.
+    assert sort_terms(penalty.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=0.0, p=[adapter._variable_map[0]]),
+            BinaryPolynomialTerm(c=0.0, p=[adapter._variable_map[1]]),
+            BinaryPolynomialTerm(
+                c=4.0, p=[adapter._variable_map[0], adapter._variable_map[1]]
+            ),
         ]
     )
 
