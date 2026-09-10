@@ -302,45 +302,6 @@ def test_penalty_binary_polynomial(instance):
     )
 
 
-def test_penalty_binary_polynomial_preserves_variable_used_only_in_binary_identity():
-    x = DecisionVariable.binary(0)
-    y = DecisionVariable.binary(1)
-    instance = Instance.from_components(
-        decision_variables=[x, y],
-        objective=x,
-        constraints={0: y * y - y == 0},
-        sense=Sense.Minimize,
-    )
-
-    penalty = OMMXDA4Adapter(instance).sampler_input.penalty_binary_polynomial
-
-    # The identity contributes no energy, but y must still reach DA4.
-    assert penalty is not None
-    assert penalty.terms == [BinaryPolynomialTerm(c=0.0, p=[1])]
-
-
-def test_penalty_binary_polynomial_preserves_variable_in_canceled_quadratic_term():
-    x = DecisionVariable.binary(0)
-    y = DecisionVariable.binary(1)
-    instance = Instance.from_components(
-        decision_variables=[x, y],
-        objective=x,
-        constraints={0: x * y == 0, 1: x * y - x == 0},
-        sense=Sense.Minimize,
-    )
-
-    penalty = OMMXDA4Adapter(instance).sampler_input.penalty_binary_polynomial
-
-    # (xy)^2 + (xy - x)^2 = x + 0xy; retain the only term containing y.
-    assert penalty is not None
-    assert sort_terms(penalty.terms) == sort_terms(
-        [
-            BinaryPolynomialTerm(c=1.0, p=[0]),
-            BinaryPolynomialTerm(c=0.0, p=[0, 1]),
-        ]
-    )
-
-
 @pytest.mark.parametrize("degree", [3, 4])
 @pytest.mark.parametrize("coefficient", [1.0, 2**-22], ids=["unit", "small"])
 def test_rejects_non_quadratic_penalty(degree, coefficient):
@@ -834,7 +795,7 @@ def test_penalty_binary_polynomial_with_duplicates(instance_with_duplicates):
     )
 
 
-def test_penalty_binary_polynomial_preserves_terms_canceled_by_one_hot():
+def test_penalty_binary_polynomial_drops_terms_canceled_by_one_hot():
     x = [DecisionVariable.binary(i) for i in range(4)]
     instance = Instance.from_components(
         decision_variables=x,
@@ -856,8 +817,6 @@ def test_penalty_binary_polynomial_preserves_terms_canceled_by_one_hot():
     assert sort_terms(penalty.terms) == sort_terms(
         [
             BinaryPolynomialTerm(c=1.0, p=[]),
-            BinaryPolynomialTerm(c=0.0, p=[adapter._variable_map[0]]),
-            BinaryPolynomialTerm(c=0.0, p=[adapter._variable_map[1]]),
             BinaryPolynomialTerm(
                 c=4.0, p=[adapter._variable_map[0], adapter._variable_map[1]]
             ),
@@ -1108,6 +1067,53 @@ def test_decode_to_sampleset(instance_knapsack_problem):
     assert len(sampleset.sample_ids_list) == 5
     assert sampleset.sense == Sense.Maximize
     assert sampleset.objectives == {0: 51.0, 1: 69.0, 2: 38.0, 3: 43.0, 4: 15.0}
+
+
+def test_decode_to_sampleset_fills_variable_in_canceled_quadratic_term():
+    x = DecisionVariable.binary(0)
+    y = DecisionVariable.binary(1)
+    instance = Instance.from_components(
+        decision_variables=[x, y],
+        objective=x,
+        constraints={0: x * y == 0, 1: x * y - x == 0},
+        sense=Sense.Minimize,
+    )
+    adapter = OMMXDA4Adapter(instance)
+
+    # (xy)² + (xy - x)² = x after binary simplification and aggregation.
+    penalty = adapter.sampler_input.penalty_binary_polynomial
+    assert penalty is not None
+    assert penalty.terms == [BinaryPolynomialTerm(c=1.0, p=[0])]
+
+    qubo_response = {
+        "qubo_solution": {
+            "progress": [],
+            "result_status": True,
+            "solutions": [
+                {
+                    "energy": 0.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {"0": False, "1": True},
+                },
+                {
+                    "energy": 0.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {"0": False},  # y (variable 1) is omitted.
+                },
+            ],
+            "timing": {"solve_time": "0", "total_elapsed_time": "0"},
+        },
+        "status": "Done",
+    }
+    sampleset = adapter.decode_to_sampleset(QuboResponse(**qubo_response))
+
+    assert sampleset.get(0).state.entries == {0: 0.0, 1: 1.0}
+    # Missing y defaults to 0.
+    assert sampleset.get(1).state.entries == {0: 0.0, 1: 0.0}
+    assert sampleset.objectives == {0: 0.0, 1: 0.0}
+    assert sampleset.feasible == {0: True, 1: True}
 
 
 def test_sample_without_token(instance_knapsack_problem):

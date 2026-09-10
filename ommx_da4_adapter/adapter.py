@@ -353,12 +353,18 @@ class OMMXDA4Adapter(SamplerAdapter):
         reversed_variable_map = {v: k for k, v in self._variable_map.items()}
 
         for solution in data.qubo_solution.solutions:
+            # Initialize all mapped variables to zero for each solution, then
+            # overwrite them with the values returned by DA4. This also supplies
+            # values needed by OMMX for variables canceled from the penalty.
+            converted_configuration = dict.fromkeys(self._variable_map, 0)
             configuration = solution.configuration
             try:
-                converted_configuration = {
-                    reversed_variable_map[int(k)]: int(v)
-                    for k, v in configuration.items()
-                }
+                converted_configuration.update(
+                    {
+                        reversed_variable_map[int(k)]: int(v)
+                        for k, v in configuration.items()
+                    }
+                )
             except KeyError as e:
                 raise OMMXDA4AdapterError(
                     f"Invalid solution configuration: The solution contains an unexpected decision variable id ({e})."
@@ -528,14 +534,14 @@ class OMMXDA4Adapter(SamplerAdapter):
                 "simplification, and aggregation."
             )
 
-        # Keep zero coefficients in linear and quadratic terms to retain variables.
-        # Any remaining higher-degree terms have zero coefficients after validation.
+        # Omit zero-coefficient terms; decode_to_sampleset() supplies values for
+        # variables missing from the response.
         penalty_binary_polynomial_terms = [
             BinaryPolynomialTerm(
                 c=value, p=self._replace_polynomials_with_variable_map(key)
             )
             for key, value in squared_terms_dict.items()
-            if len(key) <= 2
+            if value != 0.0
         ]
 
         if len(penalty_binary_polynomial_terms) == 0:
