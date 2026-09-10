@@ -655,7 +655,7 @@ def test_binary_polynomial_anchors_one_hot_group_start_index():
     assert qubo_request.binary_polynomial is not None
     assert sort_terms(qubo_request.binary_polynomial.terms) == sort_terms(
         [
-            BinaryPolynomialTerm(c=0.0, p=[0, 0]),
+            BinaryPolynomialTerm(c=0.0, p=[0]),
             BinaryPolynomialTerm(c=1.0, p=[3]),
         ]
     )
