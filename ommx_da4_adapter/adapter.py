@@ -531,7 +531,9 @@ class OMMXDA4Adapter(SamplerAdapter):
             raise OMMXDA4AdapterError(
                 f"Penalty polynomial degree {penalty_degree} exceeds DA4's "
                 "maximum supported degree of 2 after squaring, binary "
-                "simplification, and aggregation."
+                "simplification, and aggregation. "
+                "Reformulate the equality constraints so that their squared penalties "
+                "have degree at most 2 after binary simplification."
             )
 
         # Omit zero-coefficient terms; decode_to_sampleset() supplies values for

@@ -323,9 +323,10 @@ def test_rejects_non_quadratic_penalty(degree, coefficient):
     with pytest.raises(
         OMMXDA4AdapterError,
         match=f"Penalty polynomial degree {degree} exceeds DA4's maximum supported degree of 2",
-    ):
+    ) as error:
         OMMXDA4Adapter(instance)
 
+    assert "Reformulate the equality constraints" in str(error.value)
     assert instance.to_v2_bytes() == before
 
 
