@@ -1,10 +1,11 @@
 import random
+
 from .models import (
     Progress,
     QuboRequest,
     QuboResponse,
-    QuboSolutionList,
     QuboSolution,
+    QuboSolutionList,
     SolverTiming,
 )
 

@@ -12,18 +12,14 @@ pip install ommx-da4-adapter
 Here's a simple example of how to use the adapter directly:
 
 ```python
-from ommx.v1 import Instance, DecisionVariable
+from ommx import Instance
 from ommx_da4_adapter import OMMXDA4Adapter
 
-x_0 = DecisionVariable.binary(id=0, name="x_0")
-x_1 = DecisionVariable.binary(id=1, name="x_1")
-
-ommx_instance = Instance.from_components(
-    decision_variables=[x_0, x_1],
-    objective=x_0 * x_1 + x_0 - x_1 + 1,
-    constraints=[x_0 + x_1 == 1],
-    sense=Instance.MINIMIZE,
-)
+ommx_instance = Instance.minimize()
+x_0 = ommx_instance.new_binary("x_0")
+x_1 = ommx_instance.new_binary("x_1")
+ommx_instance.objective = x_0 * x_1 + x_0 - x_1 + 1
+ommx_instance.add_constraint(x_0 + x_1 == 1)
 
 ommx_sampleset = OMMXDA4Adapter.sample(
     ommx_instance=ommx_instance,
@@ -51,4 +47,3 @@ qubo_response = client.sample(qubo_request=qubo_request)
 
 ommx_sampleset = adapter.decode_to_sampleset(qubo_response)
 ```
-

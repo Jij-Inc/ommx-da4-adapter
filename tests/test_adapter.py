@@ -1,8 +1,15 @@
 import pytest
-
-from ommx.v1 import Constraint, DecisionVariable, Instance, ConstraintHints, OneHot
+from ommx import (
+    Constraint,
+    DecisionVariable,
+    Function,
+    Instance,
+    OneHotConstraint,
+    Sense,
+)
 
 from ommx_da4_adapter import OMMXDA4Adapter
+from ommx_da4_adapter.adapter import ABSOLUTE_TOLERANCE
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
 from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse
 
@@ -19,13 +26,13 @@ def instance_for_validation():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    constraint = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
-        sense=Instance.MINIMIZE,
+        constraints={0: constraint},
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -152,90 +159,36 @@ def test_max_penalty_coef(instance_for_validation):
 
 
 @pytest.fixture
-def instance_for_integer_variable():
-    x_1 = DecisionVariable.integer(id=0, name="x_1")
-    x_2 = DecisionVariable.integer(id=1, name="x_2")
-
-    objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
-
-    instance = Instance.from_components(
-        decision_variables=[x_1, x_2],
-        objective=objective,
-        constraints=constraints,
-        sense=Instance.MAXIMIZE,
-    )
-
-    return instance
-
-
-def test_check_integer_variable(instance_for_integer_variable):
-    with pytest.raises(
-        OMMXDA4AdapterError,
-        match=r"The decision variable must be binary: id .*",
-    ):
-        OMMXDA4Adapter(instance_for_integer_variable)
-
-
-@pytest.fixture
-def instance_for_continuous_variable():
-    x_1 = DecisionVariable.continuous(id=0, name="x_1")
-    x_2 = DecisionVariable.continuous(id=1, name="x_2")
-
-    objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
-
-    instance = Instance.from_components(
-        decision_variables=[x_1, x_2],
-        objective=objective,
-        constraints=constraints,
-        sense=Instance.MAXIMIZE,
-    )
-
-    return instance
-
-
-def test_check_continuous_variable(instance_for_continuous_variable):
-    with pytest.raises(
-        OMMXDA4AdapterError,
-        match=r"The decision variable must be binary: id .*",
-    ):
-        OMMXDA4Adapter(instance_for_continuous_variable)
-
-
-@pytest.fixture
 def instance():
     x_1 = DecisionVariable.binary(id=0, name="x_1")
     x_2 = DecisionVariable.binary(id=1, name="x_2")
     x_3 = DecisionVariable.binary(id=2, name="x_3")
 
-    # objective: 2x₁x₂x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
-    # constraint_equality_1: x₁x₂x₃ == 0
-    # constraint_equality_2: 3x₁x₂x₃ + 2x₁ + 5 == 0
-    # constraint_inequality_1: 4x₁x₂x₃ ≤ 0
-    # constraint_inequality_2: x₁x₂x₃ + 2x₃ + 3 ≤ 0
+    # objective: 2x₁x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
+    # constraint_equality_1: x₁x₂ == 0
+    # constraint_equality_2: 3x₁x₂ + 2x₁ + 5 == 0
+    # constraint_inequality_1: 4x₁ ≤ 0
+    # constraint_inequality_2: x₁ + 2x₃ + 3 ≤ 0
 
-    objective = 2 * x_1 * x_2 * x_3 + 3 * x_1 * x_2 + 4 * x_1 + 5 * x_2 + 6 * x_3 + 6
-    constraint_equality_1 = x_1 * x_2 * x_3 == 0
-    constraint_equality_2 = 3 * x_1 * x_2 * x_3 + 2 * x_1 + 5 == 0
-    constraint_inequality_1 = 4 * x_1 * x_2 * x_3 <= 0
-    constraint_inequality_2 = x_1 * x_2 * x_3 + 2 * x_3 + 3 <= 0
+    objective = 2 * x_1 * x_3 + 3 * x_1 * x_2 + 4 * x_1 + 5 * x_2 + 6 * x_3 + 6
+    constraint_equality_1 = x_1 * x_2 == 0
+    constraint_equality_2 = 3 * x_1 * x_2 + 2 * x_1 + 5 == 0
+    constraint_inequality_1 = 4 * x_1 <= 0
+    constraint_inequality_2 = x_1 + 2 * x_3 + 3 <= 0
 
     assert isinstance(constraint_inequality_1, Constraint)
     assert isinstance(constraint_inequality_2, Constraint)
-    constraint_inequality_1.set_id(2)
-    constraint_inequality_2.set_id(3)
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2, x_3],
         objective=objective,
-        constraints=[
-            constraint_equality_1,
-            constraint_equality_2,
-            constraint_inequality_1,
-            constraint_inequality_2,
-        ],
-        sense=Instance.MINIMIZE,
+        constraints={
+            0: constraint_equality_1,
+            1: constraint_equality_2,
+            2: constraint_inequality_1,
+            3: constraint_inequality_2,
+        },
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -317,7 +270,7 @@ def test_binary_polynomial(instance):
     qubo_request = adapter.sampler_input
 
     # assert with manually calculated values
-    # 2x₁x₂x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
+    # 2x₁x₃ + 3x₁x₂ + 4x₁ + 5x₂ + 6x₃ + 6
     assert qubo_request.binary_polynomial is not None and sort_terms(
         qubo_request.binary_polynomial.terms
     ) == sort_terms(
@@ -325,7 +278,7 @@ def test_binary_polynomial(instance):
             BinaryPolynomialTerm(c=6.0, p=[]),
             BinaryPolynomialTerm(c=4.0, p=[0]),
             BinaryPolynomialTerm(c=3.0, p=[0, 1]),
-            BinaryPolynomialTerm(c=2.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=2.0, p=[0, 2]),
             BinaryPolynomialTerm(c=5.0, p=[1]),
             BinaryPolynomialTerm(c=6.0, p=[2]),
         ]
@@ -337,16 +290,44 @@ def test_penalty_binary_polynomial(instance):
     qubo_request = adapter.sampler_input
 
     # assert with manually calculated values
-    # 52y₁y₂y₃ + 24y₁ + 25
+    # 52y₁y₂ + 24y₁ + 25
     assert qubo_request.penalty_binary_polynomial is not None and sort_terms(
         qubo_request.penalty_binary_polynomial.terms
     ) == sort_terms(
         [
-            BinaryPolynomialTerm(c=52.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=52.0, p=[0, 1]),
             BinaryPolynomialTerm(c=24.0, p=[0]),
             BinaryPolynomialTerm(c=25.0, p=[]),
         ]
     )
+
+
+@pytest.mark.parametrize("degree", [3, 4])
+@pytest.mark.parametrize("coefficient", [1.0, 2**-22], ids=["unit", "small"])
+def test_rejects_non_quadratic_penalty(degree, coefficient):
+    x = [DecisionVariable.binary(i) for i in range(degree)]
+    # Squaring produces the following cross terms (a = coefficient):
+    # degree=3: 2a(x₀x₁)(x₁x₂) = 2ax₀x₁x₂ after binary simplification.
+    # degree=4: 2a(x₀x₁)(x₂x₃) = 2ax₀x₁x₂x₃.
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={
+            0: coefficient * x[0] * x[1] + x[-2] * x[-1] - 1 == 0,
+        },
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    assert OMMXDA4Adapter.check_applicability(instance).is_member
+    with pytest.raises(
+        OMMXDA4AdapterError,
+        match=f"Penalty polynomial degree {degree} exceeds DA4's maximum supported degree of 2",
+    ) as error:
+        OMMXDA4Adapter(instance)
+
+    assert "Reformulate the equality constraints" in str(error.value)
+    assert instance.to_v2_bytes() == before
 
 
 def test_inequalities_lambda_default(instance):
@@ -384,18 +365,18 @@ def test_inequalities(instance):
     qubo_request = adapter.sampler_input
 
     # assert with manually calculated values
-    # 4x₁x₂x₃ ≤ 0
-    # x₁x₂x₃ + 2x₃ + 3 ≤ 0
+    # 4x₁ ≤ 0
+    # x₁ + 2x₃ + 3 ≤ 0
     assert qubo_request.inequalities is not None
     assert sort_terms(qubo_request.inequalities[0].terms) == sort_terms(
         [
-            BinaryPolynomialTerm(c=4.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=4.0, p=[0]),
         ]
     )
     assert sort_terms(qubo_request.inequalities[1].terms) == sort_terms(
         [
             BinaryPolynomialTerm(c=3.0, p=[]),
-            BinaryPolynomialTerm(c=1.0, p=[0, 1, 2]),
+            BinaryPolynomialTerm(c=1.0, p=[0]),
             BinaryPolynomialTerm(c=2.0, p=[2]),
         ]
     )
@@ -407,13 +388,14 @@ def instance_for_MAXIMIZE():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    equality = x_1 * x_2 == 0
+    inequality = x_1 + x_2 <= 1
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
-        sense=Instance.MAXIMIZE,
+        constraints={0: equality, 1: inequality},
+        sense=Sense.Maximize,
     )
 
     return instance
@@ -435,19 +417,44 @@ def test_binary_polynomial_for_MAXIMIZE(instance_for_MAXIMIZE):
     )
 
 
+def test_penalty_binary_polynomial_for_MAXIMIZE(instance_for_MAXIMIZE):
+    adapter = OMMXDA4Adapter(instance_for_MAXIMIZE)
+    penalty = adapter.sampler_input.penalty_binary_polynomial
+
+    # (x₁x₂)² = x₁x₂ for binary variables; the penalty stays positive.
+    assert penalty is not None
+    assert penalty.terms == [BinaryPolynomialTerm(c=1.0, p=[0, 1])]
+
+
+def test_inequalities_for_MAXIMIZE(instance_for_MAXIMIZE):
+    adapter = OMMXDA4Adapter(instance_for_MAXIMIZE)
+    inequalities = adapter.sampler_input.inequalities
+
+    # x₁ + x₂ - 1 <= 0 keeps its coefficients when maximizing.
+    assert inequalities is not None
+    [inequality] = inequalities
+    assert sort_terms(inequality.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=-1.0, p=[]),
+            BinaryPolynomialTerm(c=1.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[1]),
+        ]
+    )
+
+
 @pytest.fixture
 def instance_for_no_penalty_binary_polynomial():
     x_1 = DecisionVariable.binary(id=0, name="x_1")
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 <= 0]
+    constraint = x_1 + x_2 <= 1
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
-        sense=Instance.MINIMIZE,
+        constraints={0: constraint},
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -466,13 +473,13 @@ def instance_for_no_inequalities():
     x_2 = DecisionVariable.binary(id=1, name="x_2")
 
     objective = x_1 + x_2
-    constraints = [x_1 * x_2 == 0]
+    constraint = x_1 * x_2 == 0
 
     instance = Instance.from_components(
         decision_variables=[x_1, x_2],
         objective=objective,
-        constraints=constraints,
-        sense=Instance.MINIMIZE,
+        constraints={0: constraint},
+        sense=Sense.Minimize,
     )
 
     return instance
@@ -485,23 +492,62 @@ def test_no_inequalities(instance_for_no_inequalities):
     assert qubo_request.inequalities is None
 
 
+def test_skips_feasible_constant_constraints():
+    x = DecisionVariable.binary(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=x,
+        constraints={
+            0: Function(ABSOLUTE_TOLERANCE / 2) == 0,
+            1: Function(-ABSOLUTE_TOLERANCE / 2) == 0,
+            2: Function(ABSOLUTE_TOLERANCE / 2) <= 0,
+            3: Function(-1) <= 0,
+        },
+        sense=Sense.Minimize,
+    )
+
+    qubo_request = OMMXDA4Adapter(instance).sampler_input
+
+    assert qubo_request.penalty_binary_polynomial is None
+    assert qubo_request.inequalities is None
+
+
+@pytest.mark.parametrize(
+    "constraint",
+    [
+        Function(2 * ABSOLUTE_TOLERANCE) == 0,
+        Function(2 * ABSOLUTE_TOLERANCE) <= 0,
+    ],
+    ids=["equality", "less-than-or-equal"],
+)
+def test_rejects_infeasible_constant_constraint(constraint):
+    x = DecisionVariable.binary(0)
+    instance = Instance.from_components(
+        decision_variables=[x],
+        objective=x,
+        constraints={7: constraint},
+        sense=Sense.Minimize,
+    )
+
+    with pytest.raises(
+        OMMXDA4AdapterError,
+        match="Infeasible constant constraint was found: id 7",
+    ):
+        OMMXDA4Adapter(instance)
+
+
 @pytest.fixture
 def instance_with_a_one_hot_constraint():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    constraint = x[1] + x[2] + x[3] == 1
-
-    assert isinstance(constraint, Constraint)
-    constraint.set_id(0)
-
-    hints = ConstraintHints(one_hot_constraints=[OneHot(id=0, variables=[1, 2, 3])])
+    onehot = OneHotConstraint(variables=[x[1], x[2], x[3]])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint],
-        sense=Instance.MAXIMIZE,
-        constraint_hints=hints,
+        constraints={},
+        one_hot_constraints={0: onehot},
+        sense=Sense.Maximize,
     )
 
     return ommx_instance
@@ -509,12 +555,10 @@ def instance_with_a_one_hot_constraint():
 
 def test_variable_map_with_a_one_hot_constraint(instance_with_a_one_hot_constraint):
     adapter = OMMXDA4Adapter(instance_with_a_one_hot_constraint)
-    """
-    for hint in hints.one_hot_constraints:
-        print(hint.decision_variables)
-
-    [1, 2, 3]
-    """
+    # for one_hot_constraint in instance_with_a_one_hot_constraint.one_hot_constraints.values():
+    #     print(list(one_hot_constraint.variables))
+    #
+    # [1, 2, 3]
     assert adapter._variable_map == {
         1: 0,
         2: 1,
@@ -555,35 +599,48 @@ def test_internal_penalty_with_a_one_hot_constraint(
     assert qubo_request.fujitsuDA3.internal_penalty == 1
 
 
+def test_binary_polynomial_anchors_one_hot_group_start_index():
+    x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
+    # Keep the one-hot variables out of the objective to require the anchor.
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[3],
+        constraints={},
+        one_hot_constraints={0: OneHotConstraint(variables=[x[0], x[1], x[2]])},
+        sense=Sense.Minimize,
+    )
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [3]}
+    assert qubo_request.binary_polynomial is not None
+    assert sort_terms(qubo_request.binary_polynomial.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=0.0, p=[0]),
+            BinaryPolynomialTerm(c=1.0, p=[3]),
+        ]
+    )
+
+
 @pytest.fixture
 def instance_with_various_constraints():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(10)]
 
     objective = sum(x[i] for i in range(10))
-    constraint_1 = sum(x[i] for i in range(3)) == 1
-    constraint_2 = sum(x[i] for i in range(3, 8)) == 1
-    constraint_3 = sum(x[i] for i in range(8, 10)) <= 1
+    constraint_2 = sum(x[i] for i in range(8, 10)) <= 1
 
-    assert isinstance(constraint_1, Constraint)
     assert isinstance(constraint_2, Constraint)
-    assert isinstance(constraint_3, Constraint)
-    constraint_1.set_id(0)
-    constraint_2.set_id(1)
-    constraint_3.set_id(2)
 
-    hints = ConstraintHints(
-        one_hot_constraints=[
-            OneHot(id=0, variables=[0, 1, 2]),
-            OneHot(id=1, variables=[3, 4, 5, 6, 7]),
-        ]
-    )
+    onehot_0 = OneHotConstraint(variables=[x[0], x[1], x[2]])
+    onehot_1 = OneHotConstraint(variables=[x[3], x[4], x[5], x[6], x[7]])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint_1, constraint_2, constraint_3],
-        sense=Instance.MAXIMIZE,
-        constraint_hints=hints,
+        constraints={2: constraint_2},
+        sense=Sense.Maximize,
+        one_hot_constraints={0: onehot_0, 1: onehot_1},
     )
 
     return ommx_instance
@@ -591,13 +648,11 @@ def instance_with_various_constraints():
 
 def test_variable_map_with_various_constraints(instance_with_various_constraints):
     adapter = OMMXDA4Adapter(instance_with_various_constraints)
-    """
-    for hint in hints.one_hot_constraints:
-        print(hint.decision_variables)
-
-    [0, 1, 2]
-    [3, 4, 5, 6, 7]
-    """
+    # for one_hot_constraint in instance_with_various_constraints.one_hot_constraints.values():
+    #     print(list(one_hot_constraint.variables))
+    #
+    # [0, 1, 2]
+    # [3, 4, 5, 6, 7]
     assert adapter._variable_map == {
         3: 0,
         4: 1,
@@ -629,12 +684,12 @@ def test_one_way_one_hot_groups_with_various_constraints(
 def instance_with_no_one_hot_constraint():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    constraint = [x[1] + x[2] + x[3] == 2]
+    constraint = x[1] + x[2] + x[3] == 2
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=constraint,
-        sense=Instance.MAXIMIZE,
+        constraints={0: constraint},
+        sense=Sense.Maximize,
     )
 
     return ommx_instance
@@ -642,12 +697,10 @@ def instance_with_no_one_hot_constraint():
 
 def test_variable_map_with_no_one_hot_constraint(instance_with_no_one_hot_constraint):
     adapter = OMMXDA4Adapter(instance_with_no_one_hot_constraint)
-    """
-    for hint in hints.one_hot_constraints:
-        print(hint.decision_variables)
-
-    []
-    """
+    # for one_hot_constraint in instance_with_no_one_hot_constraint.one_hot_constraints.values():
+    #     print(list(one_hot_constraint.variables))
+    #
+    # No output
     assert adapter._variable_map == {
         0: 0,
         1: 1,
@@ -670,27 +723,15 @@ def test_one_way_one_hot_groups_with_no_one_hot_constraint(
 def instance_with_duplicates():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(5)]
     objective = sum(x[i] for i in range(5))
-    constraint_1 = sum(x[i] for i in range(2)) == 1
-    constraint_2 = sum(x[i] for i in range(1, 4)) == 1
-
-    assert isinstance(constraint_1, Constraint)
-    assert isinstance(constraint_2, Constraint)
-    constraint_1.set_id(0)
-    constraint_2.set_id(1)
-
-    hints = ConstraintHints(
-        one_hot_constraints=[
-            OneHot(id=0, variables=[0, 1]),
-            OneHot(id=1, variables=[1, 2, 3]),
-        ]
-    )
+    onehot_0 = OneHotConstraint(variables=[x[0], x[1]])
+    onehot_1 = OneHotConstraint(variables=[x[1], x[2], x[3]])
 
     ommx_instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint_1, constraint_2],
-        sense=Instance.MAXIMIZE,
-        constraint_hints=hints,
+        constraints={},
+        one_hot_constraints={0: onehot_0, 1: onehot_1},
+        sense=Sense.Maximize,
     )
 
     return ommx_instance
@@ -698,13 +739,10 @@ def instance_with_duplicates():
 
 def test_variable_map_with_duplicates(instance_with_duplicates):
     adapter = OMMXDA4Adapter(instance_with_duplicates)
-    """
-    for hint in hints.one_hot_constraints:
-        print(hint.decision_variables)
-
-    [0, 1]
-    [1, 2, 3]
-    """
+    # for one_hot_constraint in instance_with_duplicates.one_hot_constraints.values():
+    #     print(list(one_hot_constraint.variables))
+    #
+    # [1, 2, 3]
     # one hot constraints is only [1, 2, 3]
     assert adapter._variable_map == {
         1: 0,
@@ -713,6 +751,21 @@ def test_variable_map_with_duplicates(instance_with_duplicates):
         0: 3,
         4: 4,
     }
+
+
+def test_overlapping_one_hot_constraints_are_partitioned_without_mutating_input(
+    instance_with_duplicates,
+):
+    before = instance_with_duplicates.to_v2_bytes()
+
+    adapter = OMMXDA4Adapter(instance_with_duplicates)
+
+    assert instance_with_duplicates.to_v2_bytes() == before
+    assert set(instance_with_duplicates.one_hot_constraints) == {0, 1}
+    assert instance_with_duplicates.removed_one_hot_constraints == {}
+    assert instance_with_duplicates.constraints == {}
+    assert adapter._one_hot_dict == {1: [1, 2, 3]}
+    assert adapter._penalty_one_hot_dict == {0: [0, 1]}
 
 
 def test_one_way_one_hot_groups_with_duplicates(instance_with_duplicates):
@@ -743,6 +796,152 @@ def test_penalty_binary_polynomial_with_duplicates(instance_with_duplicates):
     )
 
 
+def test_penalty_binary_polynomial_drops_terms_canceled_by_one_hot():
+    x = [DecisionVariable.binary(i) for i in range(4)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={0: x[0] + x[1] == 0},
+        one_hot_constraints={
+            0: OneHotConstraint(variables=[x[0], x[1]]),
+            1: OneHotConstraint(variables=[x[1], x[2], x[3]]),
+        },
+        sense=Sense.Minimize,
+    )
+
+    adapter = OMMXDA4Adapter(instance)
+    penalty = adapter.sampler_input.penalty_binary_polynomial
+
+    assert adapter._penalty_one_hot_dict == {0: [0, 1]}
+    assert penalty is not None
+    # (x_0 + x_1)^2 + (x_0 + x_1 - 1)^2 = 4x_0x_1 + 1.
+    assert sort_terms(penalty.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(
+                c=4.0, p=[adapter._variable_map[0], adapter._variable_map[1]]
+            ),
+        ]
+    )
+
+
+def test_equal_length_overlapping_one_hot_constraints_keep_first():
+    x = [DecisionVariable.binary(i) for i in range(3)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={},
+        one_hot_constraints={
+            1: OneHotConstraint(variables=[x[1], x[2]]),
+            0: OneHotConstraint(variables=[x[0], x[1]]),
+        },
+        sense=Sense.Minimize,
+    )
+    constraint_ids = list(instance.one_hot_constraints)
+    before = instance.to_v2_bytes()
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert instance.to_v2_bytes() == before
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [2]}
+    assert qubo_request.fujitsuDA3.internal_penalty == 1
+    reversed_variable_map = {v: k for k, v in adapter._variable_map.items()}
+    assert {reversed_variable_map[i] for i in range(2)} == set(
+        instance.one_hot_constraints[constraint_ids[0]].variables
+    )
+
+    assert qubo_request.penalty_binary_polynomial is not None
+    penalty_terms = [
+        BinaryPolynomialTerm(
+            c=term.c, p=sorted(reversed_variable_map[i] for i in term.p)
+        )
+        for term in qubo_request.penalty_binary_polynomial.terms
+    ]
+    variables = sorted(instance.one_hot_constraints[constraint_ids[1]].variables)
+    # (x_a + x_b - 1)^2 for the group not handled by DA4 internally.
+    assert sort_terms(penalty_terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=-1.0, p=[variables[0]]),
+            BinaryPolynomialTerm(c=-1.0, p=[variables[1]]),
+            BinaryPolynomialTerm(c=2.0, p=variables),
+        ]
+    )
+
+
+def test_overlapping_one_hot_constraints_use_greedy_selection():
+    x = [DecisionVariable.binary(i) for i in range(7)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=0,
+        constraints={},
+        one_hot_constraints={
+            0: OneHotConstraint(variables=[x[0], x[1], x[2], x[3]]),
+            1: OneHotConstraint(variables=[x[0], x[4], x[5]]),
+            2: OneHotConstraint(variables=[x[4], x[6]]),
+        },
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert instance.to_v2_bytes() == before
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [4, 2]}
+    assert qubo_request.fujitsuDA3.internal_penalty == 1
+    reversed_variable_map = {v: k for k, v in adapter._variable_map.items()}
+    assert {reversed_variable_map[i] for i in range(4)} == {0, 1, 2, 3}
+    assert {reversed_variable_map[i] for i in range(4, 6)} == {4, 6}
+
+    assert qubo_request.penalty_binary_polynomial is not None
+    penalty_terms = [
+        BinaryPolynomialTerm(
+            c=term.c, p=sorted(reversed_variable_map[i] for i in term.p)
+        )
+        for term in qubo_request.penalty_binary_polynomial.terms
+    ]
+    # Only the rejected middle group contributes (x_0 + x_4 + x_5 - 1)^2.
+    assert sort_terms(penalty_terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=1.0, p=[]),
+            BinaryPolynomialTerm(c=-1.0, p=[0]),
+            BinaryPolynomialTerm(c=-1.0, p=[4]),
+            BinaryPolynomialTerm(c=-1.0, p=[5]),
+            BinaryPolynomialTerm(c=2.0, p=[0, 4]),
+            BinaryPolynomialTerm(c=2.0, p=[0, 5]),
+            BinaryPolynomialTerm(c=2.0, p=[4, 5]),
+        ]
+    )
+
+
+def test_regular_constraint_is_not_skipped_when_id_matches_one_hot_constraint():
+    x = [DecisionVariable.binary(id=i) for i in range(4)]
+    constraint = x[0] == 1
+
+    assert isinstance(constraint, Constraint)
+
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=sum(x),
+        constraints={0: constraint},
+        one_hot_constraints={0: OneHotConstraint(variables=[x[1], x[2], x[3]])},
+        sense=Sense.Minimize,
+    )
+
+    adapter = OMMXDA4Adapter(instance)
+    penalty = adapter.sampler_input.penalty_binary_polynomial
+
+    assert penalty is not None
+    assert sort_terms(penalty.terms) == sort_terms(
+        [
+            BinaryPolynomialTerm(c=-1.0, p=[3]),
+            BinaryPolynomialTerm(c=1.0, p=[]),
+        ]
+    )
+
+
 @pytest.fixture
 def instance_knapsack_problem():
     # Knapsack Problem
@@ -768,8 +967,8 @@ def instance_knapsack_problem():
     instance = Instance.from_components(
         decision_variables=x,
         objective=objective,
-        constraints=[constraint],
-        sense=Instance.MAXIMIZE,
+        constraints={0: constraint},
+        sense=Sense.Maximize,
     )
 
     return instance
@@ -866,10 +1065,59 @@ def test_decode_to_sampleset(instance_knapsack_problem):
 
     assert sampleset is not None
     assert len(sampleset.decision_variables) == 6
-    assert len(sampleset.sample_ids) == 5
+    assert len(sampleset.sample_ids_list) == 5
+    assert sampleset.sense == Sense.Maximize
+    assert sampleset.objectives == {0: 51.0, 1: 69.0, 2: 38.0, 3: 43.0, 4: 15.0}
 
 
-def test_sampele_without_token(instance_knapsack_problem):
+def test_decode_to_sampleset_fills_variable_in_canceled_quadratic_term():
+    x = DecisionVariable.binary(0)
+    y = DecisionVariable.binary(1)
+    instance = Instance.from_components(
+        decision_variables=[x, y],
+        objective=x,
+        constraints={0: x * y == 0, 1: x * y - x == 0},
+        sense=Sense.Minimize,
+    )
+    adapter = OMMXDA4Adapter(instance)
+
+    # (xy)² + (xy - x)² = x after binary simplification and aggregation.
+    penalty = adapter.sampler_input.penalty_binary_polynomial
+    assert penalty is not None
+    assert penalty.terms == [BinaryPolynomialTerm(c=1.0, p=[0])]
+
+    qubo_response = {
+        "qubo_solution": {
+            "progress": [],
+            "result_status": True,
+            "solutions": [
+                {
+                    "energy": 0.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {"0": False, "1": True},
+                },
+                {
+                    "energy": 0.0,
+                    "penalty_energy": 0.0,
+                    "frequency": 1,
+                    "configuration": {"0": False},  # y (variable 1) is omitted.
+                },
+            ],
+            "timing": {"solve_time": "0", "total_elapsed_time": "0"},
+        },
+        "status": "Done",
+    }
+    sampleset = adapter.decode_to_sampleset(QuboResponse(**qubo_response))
+
+    assert sampleset.get(0).state.entries == {0: 0.0, 1: 1.0}
+    # Missing y defaults to 0.
+    assert sampleset.get(1).state.entries == {0: 0.0, 1: 0.0}
+    assert sampleset.objectives == {0: 0.0, 1: 0.0}
+    assert sampleset.feasible == {0: True, 1: True}
+
+
+def test_sample_without_token(instance_knapsack_problem):
     with pytest.raises(
         OMMXDA4AdapterError,
         match="token is required. Please set the token to use the DA4 API.",
@@ -1002,6 +1250,8 @@ def test_decode_to_sample(instance_knapsack_problem):
 
     assert solution is not None
     assert len(solution.decision_variables) == 6
+    assert solution.sense == Sense.Maximize
+    assert solution.objective == 38.0
 
 
 def validate_qubo_request(qubo_request, expected_terms, expected_inequality_terms):
@@ -1022,8 +1272,8 @@ def test_partial_evaluate():
     instance = Instance.from_components(
         decision_variables=x,
         objective=1 * x[0] + 2 * x[1] + 3 * x[2],
-        constraints=[(1 * x[0] + 2 * x[1] + 3 * x[2] <= 2).set_id(0)],
-        sense=Instance.MINIMIZE,
+        constraints={0: (1 * x[0] + 2 * x[1] + 3 * x[2] <= 2)},
+        sense=Sense.Minimize,
     )
     assert instance.used_decision_variables == x
 
@@ -1101,14 +1351,14 @@ def test_relax_constraint():
     instance = Instance.from_components(
         decision_variables=x,
         objective=x[0] + x[1],
-        constraints=[(x[0] + 2 * x[1] <= 1).set_id(0), (x[1] + x[2] <= 1).set_id(1)],
-        sense=Instance.MINIMIZE,
+        constraints={0: (x[0] + 2 * x[1] <= 1), 1: (x[1] + x[2] <= 1)},
+        sense=Sense.Minimize,
     )
 
     assert instance.used_decision_variables == x
     instance.relax_constraint(1, "relax")
     # id for x[2] is listed as irrelevant
-    assert instance.decision_variable_analysis().irrelevant() == {x[2].id}
+    assert instance.irrelevant_decision_variable_ids() == {x[2].id}
 
     adapter = OMMXDA4Adapter(instance)
     qubo_request = adapter.sampler_input

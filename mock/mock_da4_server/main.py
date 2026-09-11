@@ -1,21 +1,28 @@
 import uuid
+from typing import Annotated
 
 from fastapi import BackgroundTasks, Depends, FastAPI, status
 from fastapi.responses import JSONResponse
 
-from .check import check_auth, check_accept, check_content_type
-from .job import Job, job_runner, DoneJob, WaitingJob
-from .models import QuboRequest, JobStatusList, JobID, JobStatus
-
+from .check import check_accept, check_auth, check_content_type
+from .job import DoneJob, Job, WaitingJob, job_runner
+from .models import JobID, JobStatus, JobStatusList, QuboRequest
 
 app = FastAPI()
 job_store: dict[str, Job] = {}
 
+AuthDependency = Annotated[JSONResponse | None, Depends(check_auth)]
+AcceptDependency = Annotated[JSONResponse | None, Depends(check_accept)]
+ContentTypeDependency = Annotated[
+    JSONResponse | None,
+    Depends(check_content_type),
+]
+
 
 @app.get("/v1/healthcheck", tags=["v1"])
 def get_v1_healthcheck(
-    auth: JSONResponse | None = Depends(check_auth),
-    accept: JSONResponse | None = Depends(check_accept),
+    auth: AuthDependency,
+    accept: AcceptDependency,
 ) -> JSONResponse:
     if auth is not None:
         return auth
@@ -32,9 +39,9 @@ def get_v1_healthcheck(
 def post_v4_async_qubo_solve(
     qubo_request: QuboRequest,
     background_tasks: BackgroundTasks,
-    auth: JSONResponse | None = Depends(check_auth),
-    accept: JSONResponse | None = Depends(check_accept),
-    content_type: JSONResponse | None = Depends(check_content_type),
+    auth: AuthDependency,
+    accept: AcceptDependency,
+    content_type: ContentTypeDependency,
 ) -> JSONResponse:
     if auth is not None:
         return auth
@@ -56,17 +63,15 @@ def post_v4_async_qubo_solve(
 
 @app.get("/v4/async/jobs", tags=["v4"])
 def get_v4_async_jobs(
-    auth: JSONResponse | None = Depends(check_auth),
-    accept: JSONResponse | None = Depends(check_accept),
+    auth: AuthDependency,
+    accept: AcceptDependency,
 ) -> JSONResponse:
     if auth is not None:
         return auth
     if accept is not None:
         return accept
 
-    job_status_list = []
-    for _, value in job_store.items():
-        job_status_list.append(value.get_job_status_info())
+    job_status_list = [value.get_job_status_info() for value in job_store.values()]
 
     return JSONResponse(
         status_code=status.HTTP_200_OK,
@@ -77,8 +82,8 @@ def get_v4_async_jobs(
 @app.get("/v4/async/jobs/result/{job_id}", tags=["v4"])
 def get_v4_async_jobs_result(
     job_id: str,
-    auth: JSONResponse | None = Depends(check_auth),
-    accept: JSONResponse | None = Depends(check_accept),
+    auth: AuthDependency,
+    accept: AcceptDependency,
 ) -> JSONResponse:
     if auth is not None:
         return auth
@@ -113,8 +118,8 @@ def get_v4_async_jobs_result(
 @app.delete("/v4/async/jobs/result/{job_id}", tags=["v4"])
 def delete_v4_async_jobs_result(
     job_id: str,
-    auth: JSONResponse | None = Depends(check_auth),
-    accept: JSONResponse | None = Depends(check_accept),
+    auth: AuthDependency,
+    accept: AcceptDependency,
 ) -> JSONResponse:
     if auth is not None:
         return auth
@@ -151,8 +156,8 @@ def delete_v4_async_jobs_result(
 @app.post("/v4/async/jobs/cancel", tags=["v4"])
 def post_v4_async_jobs_cancel(
     cancel_request: JobID,
-    auth: JSONResponse | None = Depends(check_auth),
-    accept: JSONResponse | None = Depends(check_accept),
+    auth: AuthDependency,
+    accept: AcceptDependency,
 ) -> JSONResponse:
     if auth is not None:
         return auth

@@ -1,9 +1,10 @@
 import time
-from typing import Any, Literal, Optional
+from typing import Any, Literal
+
 import requests
 
 from .exception import OMMXDA4AdapterError
-from .models import QuboRequest, QuboResponse, JobID
+from .models import JobID, QuboRequest, QuboResponse
 
 
 class DA4Client:
@@ -26,7 +27,7 @@ class DA4Client:
         :param version: The version of Digital Annealer as either "v4" or "v3c". Defaults to "v4".
         :raises OMMXDA4AdapterError: If the version is not "v4" or "v3c"
         """
-        if version not in set(["v4", "v3c"]):
+        if version not in {"v4", "v3c"}:
             raise OMMXDA4AdapterError(
                 "The version of Digital Annealer must be either 'v4' or 'v3c'."
             )
@@ -106,8 +107,8 @@ class DA4Client:
         self,
         qubo_request: QuboRequest,
         *,
-        blob_sas_token: Optional[str] = None,
-        blob_account_name: Optional[str] = None,
+        blob_sas_token: str | None = None,
+        blob_account_name: str | None = None,
     ) -> str:
         """Post QUBO problem to the DA4 solver with optional Azure Blob Storage support.
 
@@ -203,14 +204,12 @@ class DA4Client:
         job_list = self.get_jobs()
         for job in job_list:
             self.delete_job_result(job["job_id"])
-        return None
 
     def cancel_all_jobs(self) -> None:
         """Cancel all jobs in DA4."""
         job_list = self.get_jobs()
         for job in job_list:
             self.post_job_cancel(job["job_id"])
-        return None
 
     def fetch_job_result(self, job_id: str) -> QuboResponse:
         """Fetch job result while waiting for completion.
@@ -259,8 +258,8 @@ class DA4Client:
         self,
         qubo_request: QuboRequest,
         *,
-        blob_sas_token: Optional[str] = None,
-        blob_account_name: Optional[str] = None,
+        blob_sas_token: str | None = None,
+        blob_account_name: str | None = None,
     ) -> QuboResponse:
         """Sample the result in DA4.
 
