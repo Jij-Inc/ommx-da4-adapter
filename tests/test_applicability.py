@@ -72,23 +72,12 @@ def test_rejects_cubic_objective_without_mutating_input():
     assert instance.to_v2_bytes() == before
 
 
-@pytest.mark.parametrize(
-    ("relation", "maximum_degree"),
-    [(Equality.EqualToZero, 2), (Equality.LessThanOrEqualToZero, 1)],
-)
-def test_rejects_constraint_above_degree_bound_without_mutating_input(
-    relation, maximum_degree
-):
+def test_rejects_cubic_equality_constraint_without_mutating_input():
     x = [DecisionVariable.binary(i) for i in range(3)]
-    constraint = (
-        x[0] * x[1] * x[2] == 0
-        if relation == Equality.EqualToZero
-        else x[0] * x[1] <= 0
-    )
     instance = Instance.from_components(
         decision_variables=x,
         objective=sum(x),
-        constraints={0: constraint},
+        constraints={0: x[0] * x[1] * x[2] == 0},
         sense=Sense.Minimize,
     )
     before = instance.to_v2_bytes()
@@ -100,9 +89,32 @@ def test_rejects_constraint_above_degree_bound_without_mutating_input(
     assert isinstance(
         mismatch, InstanceClassMismatch.RegularConstraintDegreeExceedsBound
     )
-    assert mismatch.relation == relation
-    assert mismatch.actual_degrees == {0: maximum_degree + 1}
-    assert mismatch.bound.maximum_degree == maximum_degree
+    assert mismatch.relation == Equality.EqualToZero
+    assert mismatch.actual_degrees == {0: 3}
+    assert mismatch.bound.maximum_degree == 2
+    assert instance.to_v2_bytes() == before
+
+
+def test_rejects_quadratic_inequality_constraint_without_mutating_input():
+    x = [DecisionVariable.binary(i) for i in range(2)]
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=sum(x),
+        constraints={0: x[0] * x[1] <= 0},
+        sense=Sense.Minimize,
+    )
+    before = instance.to_v2_bytes()
+
+    with pytest.raises(AdapterNotApplicableError) as error:
+        OMMXDA4Adapter(instance)
+
+    [mismatch] = error.value.report.clause_reports[0].mismatches
+    assert isinstance(
+        mismatch, InstanceClassMismatch.RegularConstraintDegreeExceedsBound
+    )
+    assert mismatch.relation == Equality.LessThanOrEqualToZero
+    assert mismatch.actual_degrees == {0: 2}
+    assert mismatch.bound.maximum_degree == 1
     assert instance.to_v2_bytes() == before
 
 
