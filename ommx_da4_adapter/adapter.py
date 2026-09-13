@@ -1,4 +1,5 @@
 import copy
+import math
 from typing import ClassVar, Literal
 
 from ommx import (
@@ -522,9 +523,13 @@ class OMMXDA4Adapter(SamplerAdapter):
             )
 
         # Check the final degree after squaring, binary simplification, and aggregation.
-        # Ignore exactly zero coefficients when checking the degree.
+        # Ignore coefficients within the absolute tolerance when checking the degree.
         penalty_degree = max(
-            (len(key) for key, value in squared_terms_dict.items() if value != 0.0),
+            (
+                len(key)
+                for key, value in squared_terms_dict.items()
+                if not math.isclose(value, 0.0, abs_tol=ABSOLUTE_TOLERANCE)
+            ),
             default=0,
         )
         if penalty_degree > 2:
@@ -536,14 +541,14 @@ class OMMXDA4Adapter(SamplerAdapter):
                 "have degree at most 2 after binary simplification."
             )
 
-        # Omit zero-coefficient terms; decode_to_sampleset() supplies values for
+        # Omit coefficients within tolerance; decode_to_sampleset() supplies values for
         # variables missing from the response.
         penalty_binary_polynomial_terms = [
             BinaryPolynomialTerm(
                 c=value, p=self._replace_polynomials_with_variable_map(key)
             )
             for key, value in squared_terms_dict.items()
-            if value != 0.0
+            if not math.isclose(value, 0.0, abs_tol=ABSOLUTE_TOLERANCE)
         ]
 
         if len(penalty_binary_polynomial_terms) == 0:

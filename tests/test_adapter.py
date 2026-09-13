@@ -303,12 +303,15 @@ def test_penalty_binary_polynomial(instance):
 
 
 @pytest.mark.parametrize("degree", [3, 4])
-@pytest.mark.parametrize("coefficient", [1.0, 2**-22], ids=["unit", "small"])
+@pytest.mark.parametrize(
+    "coefficient", [1.0, ABSOLUTE_TOLERANCE], ids=["unit", "small"]
+)
 def test_rejects_non_quadratic_penalty(degree, coefficient):
     x = [DecisionVariable.binary(i) for i in range(degree)]
     # Squaring produces the following cross terms (a = coefficient):
     # degree=3: 2a(x₀x₁)(x₁x₂) = 2ax₀x₁x₂ after binary simplification.
     # degree=4: 2a(x₀x₁)(x₂x₃) = 2ax₀x₁x₂x₃.
+    # In both cases, the cross-term coefficient 2a exceeds ABSOLUTE_TOLERANCE.
     instance = Instance.from_components(
         decision_variables=x,
         objective=0,
