@@ -459,10 +459,13 @@ class OMMXDA4Adapter(SamplerAdapter):
         # DA4 starts one-way one-hot groups at the minimum polynomial variable
         # and requires it in BinaryPolynomial even with coefficient 0. This
         # adapter maps native one-hot variables from 0, which the objective may omit.
+        # Add a zero term only when the mapped variable 0 is absent from the objective.
         # Example: one-hot on x0, x1, x2 (numbers=[3]), objective x3 + 2*x4
         #   without this term: terms {p=[3], p=[4]}        -> group {3, 4, 5}
         #   with this term:    terms {p=[0], p=[3], p=[4]} -> group {0, 1, 2}
-        if self._one_hot_dict:
+        if self._one_hot_dict and not any(
+            0 in term.p for term in binary_polynomial_terms
+        ):
             binary_polynomial_terms.append(BinaryPolynomialTerm(c=0.0, p=[0]))
 
         return BinaryPolynomial(terms=binary_polynomial_terms)
