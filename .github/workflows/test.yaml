@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
@@ -20,27 +20,31 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'pip'
-      
-      - name: Install dependencies
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install Dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install ".[dev]"
-          pip install pytest-github-actions-annotate-failures
-          pip list
+          uv sync --all-extras
+          uv pip install pytest-github-actions-annotate-failures
 
       - name: Type check
+        if: always()
         run: |
-          pyright ./ommx_da4_adapter
+          uv run pyright ./ommx_da4_adapter
 
       - name: Lint
+        if: always()
         run: |
-          ruff check
+          uv run ruff check
 
-      - name: Format check
+      - name: Check format
+        if: always()
         run: |
-          ruff format --check
+          uv run ruff format --check
 
-      - name: Test
+      - name: Run Tests
+        if: always()
         run: |
-          pytest --doctest-modules -vv --ignore=mock
+          uv run pytest --doctest-modules -vv --ignore=mock

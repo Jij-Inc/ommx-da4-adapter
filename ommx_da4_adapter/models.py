@@ -1,11 +1,11 @@
-from typing import Literal, Optional, List, Dict
+from typing import Literal
 
 import pydantic
 
 
 class FujitsuDA3Solver(pydantic.BaseModel):
     time_limit_sec: int = 10
-    target_energy: Optional[float] = None
+    target_energy: float | None = None
     num_run: int = 16
     num_group: int = 1
     num_output_solution: int = 5
@@ -18,10 +18,10 @@ class FujitsuDA3Solver(pydantic.BaseModel):
     penalty_coef: int = 1
     penalty_inc_rate: int = 150
     max_penalty_coef: int = 0
-    guidance_config: Optional[Dict[str, bool]] = None
-    fixed_config: Optional[Dict[str, bool]] = None
-    one_way_one_hot_groups: Optional[Dict[Literal["numbers"], List[int]]] = None
-    two_way_one_hot_groups: Optional[Dict[Literal["numbers"], List[int]]] = None
+    guidance_config: dict[str, bool] | None = None
+    fixed_config: dict[str, bool] | None = None
+    one_way_one_hot_groups: dict[Literal["numbers"], list[int]] | None = None
+    two_way_one_hot_groups: dict[Literal["numbers"], list[int]] | None = None
 
     @pydantic.field_validator("time_limit_sec")
     @classmethod
@@ -135,7 +135,7 @@ class BinaryPolynomialTerm(pydantic.BaseModel):
     """
 
     c: float
-    p: List[int]
+    p: list[int]
 
     @pydantic.field_validator("c")
     @classmethod
@@ -149,15 +149,15 @@ class BinaryPolynomialTerm(pydantic.BaseModel):
 
 
 class BinaryPolynomial(pydantic.BaseModel):
-    terms: List[BinaryPolynomialTerm]
+    terms: list[BinaryPolynomialTerm]
 
 
 class PenaltyBinaryPolynomial(pydantic.BaseModel):
-    terms: List[BinaryPolynomialTerm]
+    terms: list[BinaryPolynomialTerm]
 
 
 class Inequalities(pydantic.BaseModel):
-    terms: List[BinaryPolynomialTerm]
+    terms: list[BinaryPolynomialTerm]
     lambda_: int = pydantic.Field(alias="lambda", default=1)
 
     @pydantic.field_validator("lambda_")
@@ -170,13 +170,13 @@ class Inequalities(pydantic.BaseModel):
 
 class QuboRequest(pydantic.BaseModel):
     fujitsuDA3: FujitsuDA3Solver
-    binary_polynomial: Optional[BinaryPolynomial] = None
-    penalty_binary_polynomial: Optional[PenaltyBinaryPolynomial] = None
-    inequalities: Optional[List[Inequalities]] = None
-    bucket_name: Optional[str] = None
-    binary_polynomial_object_name: Optional[str] = None
-    penalty_binary_polynomial_object_name: Optional[str] = None
-    inequalities_object_name: Optional[str] = None
+    binary_polynomial: BinaryPolynomial | None = None
+    penalty_binary_polynomial: PenaltyBinaryPolynomial | None = None
+    inequalities: list[Inequalities] | None = None
+    bucket_name: str | None = None
+    binary_polynomial_object_name: str | None = None
+    penalty_binary_polynomial_object_name: str | None = None
+    inequalities_object_name: str | None = None
 
 
 class Progress(pydantic.BaseModel):
@@ -189,7 +189,7 @@ class QuboSolution(pydantic.BaseModel):
     energy: float
     penalty_energy: float
     frequency: int
-    configuration: Dict[str, bool]
+    configuration: dict[str, bool]
 
 
 class SolverTiming(pydantic.BaseModel):
@@ -198,9 +198,9 @@ class SolverTiming(pydantic.BaseModel):
 
 
 class QuboSolutionList(pydantic.BaseModel):
-    progress: List[Progress]
+    progress: list[Progress]
     result_status: bool
-    solutions: List[QuboSolution]
+    solutions: list[QuboSolution]
     timing: SolverTiming
 
 

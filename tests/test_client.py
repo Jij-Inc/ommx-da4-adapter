@@ -1,7 +1,7 @@
-import unittest
-from unittest.mock import patch, MagicMock, call
-
 import json
+import unittest
+from unittest.mock import MagicMock, call, patch
+
 import requests
 
 from ommx_da4_adapter.client import DA4Client

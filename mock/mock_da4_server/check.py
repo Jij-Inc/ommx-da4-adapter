@@ -1,8 +1,9 @@
+from typing import Annotated
+
 from fastapi import Header, status
 from fastapi.responses import JSONResponse
 
 from .models import Accept, ContentType
-
 
 MOCK_API_KEY = "mock-api-key"
 
@@ -52,7 +53,7 @@ def check_auth(
 
 
 def check_accept(
-    accept: Accept = Header(None, alias="Accept"),
+    accept: Annotated[Accept | None, Header(alias="Accept")] = None,
 ) -> JSONResponse | None:
     """
     NOTE:
@@ -86,7 +87,7 @@ def check_accept(
 
 
 def check_content_type(
-    content_type: ContentType = Header(None, alias="Content-Type"),
+    content_type: Annotated[ContentType | None, Header(alias="Content-Type")] = None,
 ) -> JSONResponse | None:
     """
     NOTE:
