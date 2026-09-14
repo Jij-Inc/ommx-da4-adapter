@@ -1,0 +1,737 @@
+{
+  "started_at": "2026-09-11T00:54:45.542651+00:00",
+  "commit": "b5900f88a18d68d82e59ae9aea78753c13c05ec3",
+  "branch": "inspect_ommx_v3",
+  "working_tree_status": "M benchmarks/README.md",
+  "lock_sha256": "a7e5da09dbf6d8d95d24f401de6d70c732afddafc2528b901cde30450be3449a",
+  "python": "3.12.10 (main, Apr  9 2025, 03:49:38) [Clang 20.1.0 ]",
+  "platform": "macOS-15.7.9-arm64-arm-64bit",
+  "machine": "arm64",
+  "processor": "arm",
+  "cpu_count": 8,
+  "packages": {
+    "ommx_da4_adapter": "0.1.2.dev54+gb5900f88a.d20260911",
+    "pexpect": "4.9.0",
+    "opentelemetry-sdk": "1.43.0",
+    "msgpack": "1.2.1",
+    "pydantic_core": "2.46.4",
+    "jedi": "0.20.0",
+    "ptyprocess": "0.7.0",
+    "traitlets": "5.15.1",
+    "iniconfig": "2.3.0",
+    "pyarrow": "22.0.0",
+    "nodeenv": "1.10.0",
+    "executing": "2.2.1",
+    "opentelemetry-semantic-conventions": "0.64b0",
+    "requests": "2.34.2",
+    "rich": "15.0.0",
+    "opentelemetry-api": "1.43.0",
+    "opentelemetry-proto": "1.43.0",
+    "matplotlib-inline": "0.2.2",
+    "pyright": "1.1.411",
+    "packaging": "26.2",
+    "pytz": "2026.2",
+    "tzdata": "2026.3",
+    "ipython_pygments_lexers": "1.1.1",
+    "mdit-py-plugins": "0.6.1",
+    "charset-normalizer": "3.4.9",
+    "prompt_toolkit": "3.0.52",
+    "stack-data": "0.6.3",
+    "ipython": "9.15.0",
+    "pytest": "9.1.1",
+    "numpy": "2.5.1",
+    "certifi": "2026.6.17",
+    "protobuf": "7.35.1",
+    "Pygments": "2.20.0",
+    "mdurl": "0.1.2",
+    "ruff": "0.16.4",
+    "python-dateutil": "2.9.0.post0",
+    "textual": "8.2.8",
+    "platformdirs": "4.11.7",
+    "linkify-it-py": "2.2.0",
+    "Jinja2": "3.1.6",
+    "pandas": "2.3.3",
+    "markdown-it-py": "4.2.0",
+    "MarkupSafe": "3.0.3",
+    "pure_eval": "0.2.3",
+    "wcwidth": "0.8.2",
+    "pluggy": "1.6.0",
+    "pydantic": "2.13.4",
+    "opentelemetry-exporter-otlp-proto-common": "1.43.0",
+    "urllib3": "2.7.0",
+    "typing_extensions": "4.16.0",
+    "asttokens": "3.0.2",
+    "decorator": "5.3.1",
+    "memray": "1.20.0",
+    "psutil": "7.2.2",
+    "parso": "0.8.7",
+    "idna": "3.18",
+    "typing-inspection": "0.4.2",
+    "annotated-types": "0.7.0",
+    "ommx": "3.0.0b5",
+    "six": "1.17.0"
+  },
+  "seed": 0,
+  "sample_count": 16,
+  "unique_solutions": 1,
+  "warmup": 3,
+  "repeat": 20,
+  "metrics": [
+    "timing",
+    "memory"
+  ],
+  "cases_per_metric": 81,
+  "cases": [
+    [
+      "instance-to-request",
+      "knapsack",
+      "regular",
+      "none",
+      "none",
+      100
+    ],
+    [
+      "instance-to-request",
+      "knapsack",
+      "regular",
+      "none",
+      "none",
+      400
+    ],
+    [
+      "instance-to-request",
+      "knapsack",
+      "regular",
+      "none",
+      "none",
+      900
+    ],
+    [
+      "instance-to-request",
+      "assignment",
+      "regular",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "assignment",
+      "regular",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "assignment",
+      "regular",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "assignment",
+      "one-hot",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "assignment",
+      "one-hot",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "assignment",
+      "one-hot",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "tsp",
+      "regular",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "tsp",
+      "regular",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "tsp",
+      "regular",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "tsp",
+      "one-hot",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "tsp",
+      "one-hot",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "tsp",
+      "one-hot",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      10
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      20
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      30
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      10
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      20
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      30
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "none",
+      10
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "none",
+      20
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "none",
+      30
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      10
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      20
+    ],
+    [
+      "instance-to-request",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      30
+    ],
+    [
+      "response-to-solution",
+      "knapsack",
+      "regular",
+      "none",
+      "none",
+      100
+    ],
+    [
+      "response-to-solution",
+      "knapsack",
+      "regular",
+      "none",
+      "none",
+      400
+    ],
+    [
+      "response-to-solution",
+      "knapsack",
+      "regular",
+      "none",
+      "none",
+      900
+    ],
+    [
+      "response-to-solution",
+      "assignment",
+      "regular",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "assignment",
+      "regular",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "assignment",
+      "regular",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "assignment",
+      "one-hot",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "assignment",
+      "one-hot",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "assignment",
+      "one-hot",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "tsp",
+      "regular",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "tsp",
+      "regular",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "tsp",
+      "regular",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "tsp",
+      "one-hot",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "tsp",
+      "one-hot",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "tsp",
+      "one-hot",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "none",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "none",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "none",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      10
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      20
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      30
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      10
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      20
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      30
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "none",
+      10
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "none",
+      20
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "none",
+      30
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      10
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      20
+    ],
+    [
+      "response-to-solution",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      30
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      10
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      20
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator",
+      "recommended",
+      30
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      10
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      20
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "sos1",
+      "recommended",
+      30
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      10
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      20
+    ],
+    [
+      "prepare",
+      "one-hot-preparation",
+      "one-hot",
+      "indicator-sos1",
+      "recommended",
+      30
+    ]
+  ],
+  "completed_measurements": 162,
+  "status": "complete",
+  "finished_at": "2026-09-11T00:55:33.270550+00:00"
+}

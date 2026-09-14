@@ -5,7 +5,13 @@
 
 ## 測定結果
 
+- [2026年9月14日: レビュー対応後のv2 / v3再測定、全270測定](benchmark-results-20260914-review-fixes.md)
+- [2026年9月11日: decode修正後のv2 / v3再測定、全270測定](benchmark-results-20260911-decode-zero-fill.md)
 - [2026年9月8日: OMMX 2.6.1 / 3.0.0b5、全294測定](benchmark-results-20260908-beta5.md)
+
+9月11日はv2・v3を両方再測定しました。v3で受理できないCliqueを除き、
+v2は共通54条件の時間・メモリ、計108測定を実行しています。除外方法と
+測定コマンドは上記レポートに記載しています。
 
 ## Instance
 
