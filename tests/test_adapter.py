@@ -303,12 +303,15 @@ def test_penalty_binary_polynomial(instance):
 
 
 @pytest.mark.parametrize("degree", [3, 4])
-@pytest.mark.parametrize("coefficient", [1.0, 2**-22], ids=["unit", "small"])
+@pytest.mark.parametrize(
+    "coefficient", [1.0, ABSOLUTE_TOLERANCE], ids=["unit", "small"]
+)
 def test_rejects_non_quadratic_penalty(degree, coefficient):
     x = [DecisionVariable.binary(i) for i in range(degree)]
     # Squaring produces the following cross terms (a = coefficient):
     # degree=3: 2a(x₀x₁)(x₁x₂) = 2ax₀x₁x₂ after binary simplification.
     # degree=4: 2a(x₀x₁)(x₂x₃) = 2ax₀x₁x₂x₃.
+    # In both cases, the cross-term coefficient 2a exceeds ABSOLUTE_TOLERANCE.
     instance = Instance.from_components(
         decision_variables=x,
         objective=0,
@@ -323,9 +326,10 @@ def test_rejects_non_quadratic_penalty(degree, coefficient):
     with pytest.raises(
         OMMXDA4AdapterError,
         match=f"Penalty polynomial degree {degree} exceeds DA4's maximum supported degree of 2",
-    ):
+    ) as error:
         OMMXDA4Adapter(instance)
 
+    assert "Reformulate the equality constraints" in str(error.value)
     assert instance.to_v2_bytes() == before
 
 
@@ -600,12 +604,15 @@ def test_internal_penalty_with_a_one_hot_constraint(
 
 def test_binary_polynomial_anchors_one_hot_group_start_index():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
-    # Keep the one-hot variables out of the objective to require the anchor.
+    # x1, x2, x3 map to DA4 variables 0, 1, 2; x0 maps to 3.
+    # The objective only contains p=[3], so a zero-coefficient anchor
+    # (BinaryPolynomialTerm(c=0.0, p=[0])) is needed to make the group
+    # start at 0 ({0, 1, 2}) instead of 3 ({3, 4, 5}).
     instance = Instance.from_components(
         decision_variables=x,
-        objective=x[3],
+        objective=x[0],
         constraints={},
-        one_hot_constraints={0: OneHotConstraint(variables=[x[0], x[1], x[2]])},
+        one_hot_constraints={0: OneHotConstraint(variables=[x[1], x[2], x[3]])},
         sense=Sense.Minimize,
     )
 
@@ -620,6 +627,50 @@ def test_binary_polynomial_anchors_one_hot_group_start_index():
             BinaryPolynomialTerm(c=1.0, p=[3]),
         ]
     )
+
+
+def test_binary_polynomial_skips_one_hot_anchor_for_linear_term():
+    x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
+    # x1 maps to c=1.0, p=[0].
+    # An anchor (c=0.0, p=[0], used to make the one-hot group start at 0)
+    # is unnecessary because the objective already contains DA4 variable 0.
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[1],
+        constraints={},
+        one_hot_constraints={0: OneHotConstraint(variables=[x[1], x[2], x[3]])},
+        sense=Sense.Minimize,
+    )
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [3]}
+    assert qubo_request.binary_polynomial is not None
+    assert qubo_request.binary_polynomial.terms == [BinaryPolynomialTerm(c=1.0, p=[0])]
+
+
+def test_binary_polynomial_skips_one_hot_anchor_for_quadratic_term():
+    x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
+    # x1 * x2 maps to c=1.0, p=[0, 1].
+    # An anchor (c=0.0, p=[0], used to make the one-hot group start at 0)
+    # is unnecessary because the objective already contains DA4 variable 0.
+    instance = Instance.from_components(
+        decision_variables=x,
+        objective=x[1] * x[2],
+        constraints={},
+        one_hot_constraints={0: OneHotConstraint(variables=[x[1], x[2], x[3]])},
+        sense=Sense.Minimize,
+    )
+
+    adapter = OMMXDA4Adapter(instance)
+    qubo_request = adapter.sampler_input
+
+    assert qubo_request.fujitsuDA3.one_way_one_hot_groups == {"numbers": [3]}
+    assert qubo_request.binary_polynomial is not None
+    assert qubo_request.binary_polynomial.terms == [
+        BinaryPolynomialTerm(c=1.0, p=[0, 1])
+    ]
 
 
 @pytest.fixture

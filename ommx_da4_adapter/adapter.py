@@ -1,4 +1,5 @@
 import copy
+import math
 from typing import ClassVar, Literal
 
 from ommx import (
@@ -458,10 +459,13 @@ class OMMXDA4Adapter(SamplerAdapter):
         # DA4 starts one-way one-hot groups at the minimum polynomial variable
         # and requires it in BinaryPolynomial even with coefficient 0. This
         # adapter maps native one-hot variables from 0, which the objective may omit.
+        # Add a zero term only when the mapped variable 0 is absent from the objective.
         # Example: one-hot on x0, x1, x2 (numbers=[3]), objective x3 + 2*x4
         #   without this term: terms {p=[3], p=[4]}        -> group {3, 4, 5}
         #   with this term:    terms {p=[0], p=[3], p=[4]} -> group {0, 1, 2}
-        if self._one_hot_dict:
+        if self._one_hot_dict and not any(
+            0 in term.p for term in binary_polynomial_terms
+        ):
             binary_polynomial_terms.append(BinaryPolynomialTerm(c=0.0, p=[0]))
 
         return BinaryPolynomial(terms=binary_polynomial_terms)
@@ -522,26 +526,32 @@ class OMMXDA4Adapter(SamplerAdapter):
             )
 
         # Check the final degree after squaring, binary simplification, and aggregation.
-        # Ignore exactly zero coefficients when checking the degree.
+        # Ignore coefficients within the absolute tolerance when checking the degree.
         penalty_degree = max(
-            (len(key) for key, value in squared_terms_dict.items() if value != 0.0),
+            (
+                len(key)
+                for key, value in squared_terms_dict.items()
+                if not math.isclose(value, 0.0, abs_tol=ABSOLUTE_TOLERANCE)
+            ),
             default=0,
         )
         if penalty_degree > 2:
             raise OMMXDA4AdapterError(
                 f"Penalty polynomial degree {penalty_degree} exceeds DA4's "
                 "maximum supported degree of 2 after squaring, binary "
-                "simplification, and aggregation."
+                "simplification (e.g., x² = x), and aggregation. "
+                "Reformulate the equality constraints so that their squared penalties "
+                "have degree at most 2 after binary simplification."
             )
 
-        # Omit zero-coefficient terms; decode_to_sampleset() supplies values for
+        # Omit coefficients within tolerance; decode_to_sampleset() supplies values for
         # variables missing from the response.
         penalty_binary_polynomial_terms = [
             BinaryPolynomialTerm(
                 c=value, p=self._replace_polynomials_with_variable_map(key)
             )
             for key, value in squared_terms_dict.items()
-            if value != 0.0
+            if not math.isclose(value, 0.0, abs_tol=ABSOLUTE_TOLERANCE)
         ]
 
         if len(penalty_binary_polynomial_terms) == 0:
