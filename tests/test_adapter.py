@@ -605,7 +605,9 @@ def test_internal_penalty_with_a_one_hot_constraint(
 def test_binary_polynomial_anchors_one_hot_group_start_index():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
     # x1, x2, x3 map to DA4 variables 0, 1, 2; x0 maps to 3.
-    # The objective omits DA4 variable 0, so a zero-coefficient anchor is needed.
+    # The objective only contains p=[3], so a zero-coefficient anchor
+    # (BinaryPolynomialTerm(c=0.0, p=[0])) is needed to make the group
+    # start at 0 ({0, 1, 2}) instead of 3 ({3, 4, 5}).
     instance = Instance.from_components(
         decision_variables=x,
         objective=x[0],
