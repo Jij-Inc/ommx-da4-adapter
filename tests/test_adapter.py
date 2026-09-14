@@ -631,7 +631,9 @@ def test_binary_polynomial_anchors_one_hot_group_start_index():
 
 def test_binary_polynomial_skips_one_hot_anchor_for_linear_term():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
-    # x1 maps to DA4 variable 0, which is already present in the linear term.
+    # x1 maps to c=1.0, p=[0].
+    # An anchor (c=0.0, p=[0], used to make the one-hot group start at 0)
+    # is unnecessary because the objective already contains DA4 variable 0.
     instance = Instance.from_components(
         decision_variables=x,
         objective=x[1],
@@ -650,7 +652,9 @@ def test_binary_polynomial_skips_one_hot_anchor_for_linear_term():
 
 def test_binary_polynomial_skips_one_hot_anchor_for_quadratic_term():
     x = [DecisionVariable.binary(id=i, name="x", subscripts=[i]) for i in range(4)]
-    # x1 maps to DA4 variable 0, which is already present in the quadratic term.
+    # x1 * x2 maps to c=1.0, p=[0, 1].
+    # An anchor (c=0.0, p=[0], used to make the one-hot group start at 0)
+    # is unnecessary because the objective already contains DA4 variable 0.
     instance = Instance.from_components(
         decision_variables=x,
         objective=x[1] * x[2],
