@@ -1,0 +1,36 @@
+{
+  "instance-to-request": {
+    "count": 27,
+    "timing": {
+      "lower": 19,
+      "same": 0,
+      "higher": 8,
+      "min_percent": -41.20164937396383,
+      "max_percent": 10.776190602347913
+    },
+    "memory": {
+      "lower": 22,
+      "same": 2,
+      "higher": 3,
+      "min_percent": -8.825229092710307,
+      "max_percent": 29.478891835674624
+    }
+  },
+  "response-to-solution": {
+    "count": 27,
+    "timing": {
+      "lower": 4,
+      "same": 0,
+      "higher": 23,
+      "min_percent": -13.730849420484613,
+      "max_percent": 49.623126721723665
+    },
+    "memory": {
+      "lower": 25,
+      "same": 0,
+      "higher": 2,
+      "min_percent": -18.346983377116487,
+      "max_percent": 0.276486568065204
+    }
+  }
+}

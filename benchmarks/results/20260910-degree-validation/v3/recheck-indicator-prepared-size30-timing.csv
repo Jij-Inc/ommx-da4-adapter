@@ -1,0 +1,6 @@
+run,operation,instance,formulation,special_constraints,preparation,size,seed,sample_count,unique_solutions,warmup,repeat,python_version,first_seconds,median_seconds,ommx_version,pydantic_version,adapter_version
+1,response-to-solution,one-hot-preparation,one-hot,indicator,recommended,30,0,16,1,3,20,3.12.10,0.003922750,0.003265583,3.0.0b5,2.13.4,0.1.2.dev48+g702d7b520
+2,response-to-solution,one-hot-preparation,one-hot,indicator,recommended,30,0,16,1,3,20,3.12.10,0.003465583,0.003312667,3.0.0b5,2.13.4,0.1.2.dev48+g702d7b520
+3,response-to-solution,one-hot-preparation,one-hot,indicator,recommended,30,0,16,1,3,20,3.12.10,0.003358375,0.003355562,3.0.0b5,2.13.4,0.1.2.dev48+g702d7b520
+4,response-to-solution,one-hot-preparation,one-hot,indicator,recommended,30,0,16,1,3,20,3.12.10,0.003402625,0.003350042,3.0.0b5,2.13.4,0.1.2.dev48+g702d7b520
+5,response-to-solution,one-hot-preparation,one-hot,indicator,recommended,30,0,16,1,3,20,3.12.10,0.003470709,0.003345937,3.0.0b5,2.13.4,0.1.2.dev48+g702d7b520

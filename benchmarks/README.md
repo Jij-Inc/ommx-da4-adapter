@@ -1,14 +1,22 @@
 # DA4 adapter conversion benchmarks (OMMX v3)
 
 固定seedからOMMX v3 Instanceを直接生成し、`inspect_ommx_v2`と共通の問題を測定します。
-`update_ommx_v3`のコミット`510b7d0`を取り込み、OMMX 3.0.0b5で検証します。
+`update_ommx_v3`のコミット`d31504c`を取り込み、OMMX 3.0.0b5で検証します。
 
 ## 測定結果
 
+- [2026年9月14日: レビュー対応後のv2 / v3再測定、全270測定](benchmark-results-20260914-review-fixes.md)
+- [2026年9月11日: decode修正後のv2 / v3再測定、全270測定](benchmark-results-20260911-decode-zero-fill.md)
+- [2026年9月10日: 次数検証追加後のOMMX v3、全162測定](benchmark-results-20260910-degree-validation.md)
 - [2026年9月8日: OMMX 2.6.1 / 3.0.0b5、全294測定](benchmark-results-20260908-beta5.md)
 - [2026年8月25日: OMMX v2/v3比較（Preparation workload整合前）](benchmark-results-20260825.md)
 
-上記は次数検証の追加前に取得した結果です。`510b7d0`取り込み後の再測定は未実施です。
+9月8日以前は次数検証の追加前の結果です。9月10日は`510b7d0`取り込み後のv3を
+再測定し、v2との比較には9月8日の保存データを使用しています。
+9月11日は`5eba025`取り込み後のv3とv2を両方再測定しました。Cliqueを除いた
+共通54条件に、v3のprepared変換18条件とPreparation単体9条件を加えています。
+
+9月14日は`d31504c`までのレビュー対応を取り込み、v2・v3を同条件で再測定しました。
 
 ## Instance
 
@@ -72,7 +80,7 @@ DA4のトークンは不要です。DA4Client・ネットワーク・求解を�
 ```console
 uv sync --frozen --all-extras --group benchmark --python 3.12.10
 uv run --frozen --group benchmark python -m benchmarks.run \
-  --output benchmark_results/20260908-beta5 \
+  --output benchmark_results/20260914-review-fixes \
   --seed 0 --sample-count 16 --warmup 3 --repeat 20
 ```
 
@@ -92,7 +100,8 @@ memrayのピークは追跡対象アロケーションの指標で、プロセ�
 
 DA4のv2はOneHot hintsをnative groupの選択に使うので、v2/v3ともに
 `assignment` / `tsp`の`regular`と`one-hot`を測定します。
-v3ではnative groupの開始位置を保証するゼロ係数項がRequestへ追加されます。
+v3では目的関数にDA4の変数番号0が含まれない場合だけ、native groupの開始位置を
+保証するゼロ係数項がRequestへ追加されます。
 v2/v3の同値性確認では変数IDの対応を戻し、ゼロ係数項を除いて数式を比較します。
 
 | Operation | 通常問題 | Preparation比較用 | 合計 |

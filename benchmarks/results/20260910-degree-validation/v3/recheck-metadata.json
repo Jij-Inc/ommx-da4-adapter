@@ -1,0 +1,32 @@
+{
+  "started_at": "2026-09-10T05:09:41.143217+00:00",
+  "reason": "Check the reproducibility of the outlying first decode time in the original run; original measurements remain unchanged.",
+  "command": [
+    "/private/tmp/ommx-da4-inspect-v3/.venv/bin/python",
+    "-m",
+    "benchmarks.timing",
+    "response-to-solution",
+    "--instance",
+    "one-hot-preparation",
+    "--formulation",
+    "one-hot",
+    "--special-constraints",
+    "indicator",
+    "--preparation",
+    "recommended",
+    "--size",
+    "30",
+    "--seed",
+    "0",
+    "--sample-count",
+    "16",
+    "--warmup",
+    "3",
+    "--repeat",
+    "20"
+  ],
+  "commit": "702d7b520b9a2fa5bd50be09d555a2ccad29bf10",
+  "runs": 5,
+  "finished_at": "2026-09-10T05:09:42.694740+00:00",
+  "status": "complete"
+}
