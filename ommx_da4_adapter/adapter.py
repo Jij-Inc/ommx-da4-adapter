@@ -354,8 +354,17 @@ class OMMXDA4Adapter(SamplerAdapter):
           currently unused.
         :return: Solution
         """
-        adapter, response = cls._sample_da4(ommx_instance, token, url, version)
-        return adapter.decode(response)
+        # Subclasses can supply their own samples or change how they are decoded.
+        if cls is OMMXDA4Adapter:
+            adapter, response = cls._sample_da4(ommx_instance, token, url, version)
+            return adapter.decode(response)
+        return cls.sample_without_preparation(
+            ommx_instance,
+            token=token,
+            url=url,
+            version=version,
+            diagnostics=diagnostics,
+        ).best_feasible
 
     def decode_to_sampleset(self, data: QuboResponse) -> SampleSet:
         """Decode QuboResponse to SampleSet.
@@ -405,7 +414,9 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param data: The QUBO result data from DA4
         :return: Solution
         """
-        return self._evaluate_samples(data, expand_frequency=False).best_feasible
+        if type(self) is OMMXDA4Adapter:
+            return self._evaluate_samples(data, expand_frequency=False).best_feasible
+        return self.decode_to_sampleset(data).best_feasible
 
     def _validate_constraints(self) -> None:
         """Validate regular constraints and reject infeasible constants."""

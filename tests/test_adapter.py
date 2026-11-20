@@ -445,6 +445,53 @@ def test_decode_preserves_observed_frequencies_and_large_variable_ids():
     assert adapter.decode(response).state.entries == {x.id: 0}
 
 
+def test_solve_uses_subclass_sampler():
+    instance = Instance.maximize()
+    x = instance.new_binary("x")
+    instance.objective = x
+    diagnostics = object()
+
+    class OfflineAdapter(OMMXDA4Adapter):
+        @classmethod
+        def sample_without_preparation(cls, prepared, **kwargs):
+            assert kwargs == {
+                "token": None,
+                "url": "https://example.com",
+                "version": "v3c",
+                "diagnostics": diagnostics,
+            }
+            return prepared.evaluate_samples([{x.id: 0}, {x.id: 1}])
+
+    result = OfflineAdapter.solve(
+        instance, url="https://example.com", version="v3c", diagnostics=diagnostics
+    )
+    assert result.state.entries == {x.id: 1}
+
+
+def test_decode_uses_subclass_sampleset():
+    instance = Instance.maximize()
+    x = instance.new_binary("x")
+    instance.objective = x
+    response = QuboResponse.model_validate(
+        {
+            "status": "Done",
+            "qubo_solution": {
+                "solutions": [],
+                "progress": [],
+                "result_status": True,
+                "timing": {"solve_time": "0", "total_elapsed_time": "0"},
+            },
+        }
+    )
+
+    class CustomDecoder(OMMXDA4Adapter):
+        def decode_to_sampleset(self, data):
+            assert data is response
+            return instance.evaluate_samples([{x.id: 0}, {x.id: 1}])
+
+    assert CustomDecoder(instance).decode(response).state.entries == {x.id: 1}
+
+
 def test_inequalities(instance):
     adapter = OMMXDA4Adapter(instance)
     qubo_request = adapter.sampler_input
