@@ -1,4 +1,5 @@
 import operator
+from itertools import permutations
 from math import prod
 
 import pytest
@@ -20,6 +21,7 @@ from ommx import (
 from pydantic import ValidationError
 
 from ommx_da4_adapter import OMMXDA4Adapter
+from ommx_da4_adapter.adapter import ABSOLUTE_TOLERANCE
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
 from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse, QuboSolution
 
@@ -314,13 +316,14 @@ def test_penalty_binary_polynomial(instance):
 
 @pytest.mark.parametrize("degree", [3, 4])
 @pytest.mark.parametrize(
-    "coefficient", [1.0, 1e-6, 1e-8], ids=["unit", "small", "tiny"]
+    "coefficient", [1.0, ABSOLUTE_TOLERANCE], ids=["unit", "small"]
 )
 def test_rejects_non_quadratic_penalty(degree, coefficient):
     x = [DecisionVariable.binary(i) for i in range(degree)]
     # Squaring produces the following cross terms (a = coefficient):
     # degree=3: 2a(x₀x₁)(x₁x₂) = 2ax₀x₁x₂ after binary simplification.
     # degree=4: 2a(x₀x₁)(x₂x₃) = 2ax₀x₁x₂x₃.
+    # In both cases, the cross-term coefficient 2a exceeds ABSOLUTE_TOLERANCE.
     instance = Instance.from_components(
         decision_variables=x,
         objective=0,
@@ -368,15 +371,23 @@ def test_inequalities_lambda(instance, id_type):
     }
 
 
-def test_small_nonzero_squared_penalty_is_preserved():
-    instance = Instance.minimize()
-    x = instance.new_binary("x")
-    instance.add_constraint(0.0005 * x == 0)
-
+@pytest.mark.parametrize("weights", list(permutations((1, 2, -3))))
+def test_cubic_penalty_cancels_in_any_constraint_order(weights):
+    x, y, z = [DecisionVariable.binary(i) for i in range(3)]
+    instance = Instance.from_components(
+        decision_variables=[x, y, z],
+        objective=0,
+        active_constraints={
+            i: 0.1 * x * y + weight * z == 0 for i, weight in enumerate(weights)
+        },
+        sense=Sense.Minimize,
+    )
     penalty = OMMXDA4Adapter(instance).sampler_input.penalty_binary_polynomial
-    assert not instance.evaluate({x.id: 1}).feasible
+    # The xyz coefficient is 2 * 0.1 * (1 + 2 - 3).
     assert penalty is not None
-    assert penalty.terms == [BinaryPolynomialTerm(c=0.0005**2, p=[0])]
+    assert {tuple(t.p): t.c for t in penalty.terms} == pytest.approx(
+        {(0, 1): 0.03, (2,): 14.0}
+    )
 
 
 @pytest.mark.parametrize("fixed", [0, 1])
