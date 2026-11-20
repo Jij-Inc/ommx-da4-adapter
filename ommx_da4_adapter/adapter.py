@@ -1,6 +1,6 @@
 import copy
 from collections.abc import Mapping
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, final
 
 from ommx import (
     Constraint,
@@ -39,6 +39,7 @@ from .models import (
 )
 
 
+@final
 class OMMXDA4Adapter(SamplerAdapter):
     INPUT_CLASS: ClassVar[InstanceClass] = InstanceClass(
         [
@@ -354,17 +355,8 @@ class OMMXDA4Adapter(SamplerAdapter):
           currently unused.
         :return: Solution
         """
-        # Subclasses can supply their own samples or change how they are decoded.
-        if cls is OMMXDA4Adapter:
-            adapter, response = cls._sample_da4(ommx_instance, token, url, version)
-            return adapter.decode(response)
-        return cls.sample_without_preparation(
-            ommx_instance,
-            token=token,
-            url=url,
-            version=version,
-            diagnostics=diagnostics,
-        ).best_feasible
+        adapter, response = cls._sample_da4(ommx_instance, token, url, version)
+        return adapter.decode(response)
 
     def decode_to_sampleset(self, data: QuboResponse) -> SampleSet:
         """Decode QuboResponse to SampleSet.
@@ -414,9 +406,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param data: The QUBO result data from DA4
         :return: Solution
         """
-        if type(self) is OMMXDA4Adapter:
-            return self._evaluate_samples(data, expand_frequency=False).best_feasible
-        return self.decode_to_sampleset(data).best_feasible
+        return self._evaluate_samples(data, expand_frequency=False).best_feasible
 
     def _validate_constraints(self) -> None:
         """Validate regular constraints and reject infeasible constants."""
