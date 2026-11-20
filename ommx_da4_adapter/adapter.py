@@ -119,7 +119,9 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param max_penalty_coef: Maximum value of constraint term coefficients. If 0 is set, there is no maximum value
         :param guidance_config: Initial value of each variable
         :param fixed_config: Fixed value for each variable
-        :param inequalities_lambda: Integer coefficients keyed by regular constraint ID. The default coefficient is 1.
+        :param inequalities_lambda: DA4 inequality weights keyed by OMMX ``ConstraintID``.
+            Each weight must be an integer from 1 to 1,000,000,000 inclusive.
+            Inequalities without a specified weight use 1.
         """
         self.require_applicable(ommx_instance)
 
