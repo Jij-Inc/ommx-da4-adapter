@@ -23,7 +23,6 @@ from ommx import (
     Sense,
     Solution,
     SpecialConstraintPreparation,
-    get_default_atol,
 )
 from ommx.adapter import DiagnosticsSink, SamplerAdapter
 
@@ -38,7 +37,6 @@ from .models import (
     QuboRequest,
     QuboResponse,
 )
-
 
 ABSOLUTE_TOLERANCE = 1e-6
 
@@ -109,8 +107,6 @@ class OMMXDA4Adapter(SamplerAdapter):
     ):
         """Digital Annealer adapter for OMMX.
 
-        Keep the supplied instance unchanged until decoding is complete.
-
         :param ommx_instance: OMMX instance
         :param time_limit_sec: Upper limit of execution time (in seconds)
         :param target_energy: Target energy to be terminated when reached
@@ -148,8 +144,7 @@ class OMMXDA4Adapter(SamplerAdapter):
             self._one_hot_dict,
             self._penalty_one_hot_dict,
         ) = self._partition_one_hot_constraints()
-        variables = ommx_instance.active_decision_variables
-        self._variable_map = self._generate_variable_map(variables)
+        self._variable_map = self._generate_variable_map()
 
         # generate QuboRequest from OMMX instance
         self._sampler_input = QuboRequest(
@@ -174,7 +169,7 @@ class OMMXDA4Adapter(SamplerAdapter):
             ),
             binary_polynomial=self._generate_binary_polynomial(),
             penalty_binary_polynomial=self._generate_penalty_binary_polynomial(),
-            inequalities=self._generate_inequalities(variables),
+            inequalities=self._generate_inequalities(),
         )
 
     @property
@@ -266,25 +261,19 @@ class OMMXDA4Adapter(SamplerAdapter):
           currently unused.
         :return: SampleSet
         """
-        adapter, response = cls._sample_da4(ommx_instance, token, url, version)
-        return adapter.decode_to_sampleset(response)
-
-    @classmethod
-    def _sample_da4(
-        cls,
-        ommx_instance: Instance,
-        token: str | None,
-        url: str,
-        version: Literal["v4", "v3c"],
-    ) -> tuple["OMMXDA4Adapter", QuboResponse]:
         if token is None:
             raise OMMXDA4AdapterError(
                 "token is required. Please set the token to use the DA4 API."
             )
 
+        # TODO: Update the diagnostics docstrings when support is implemented.
+        _ = diagnostics
         adapter = cls(ommx_instance)
+        qubo_request = adapter.sampler_input
         client = DA4Client(token=token, url=url, version=version)
-        return adapter, client.sample(qubo_request=adapter.sampler_input)
+        qubo_response = client.sample(qubo_request=qubo_request)
+
+        return adapter.decode_to_sampleset(qubo_response)
 
     @classmethod
     def solve(
@@ -359,8 +348,13 @@ class OMMXDA4Adapter(SamplerAdapter):
           currently unused.
         :return: Solution
         """
-        adapter, response = cls._sample_da4(ommx_instance, token, url, version)
-        return adapter.decode(response)
+        return cls.sample_without_preparation(
+            ommx_instance,
+            token=token,
+            url=url,
+            version=version,
+            diagnostics=diagnostics,
+        ).best_feasible
 
     def decode_to_sampleset(self, data: QuboResponse) -> SampleSet:
         """Decode QuboResponse to SampleSet.
@@ -369,19 +363,12 @@ class OMMXDA4Adapter(SamplerAdapter):
         :return: SampleSet
         """
 
-        return self._evaluate_samples(data, expand_frequency=True)
-
-    def _evaluate_samples(
-        self, data: QuboResponse, *, expand_frequency: bool
-    ) -> SampleSet:
-        sample_id = 0
-        samples = Samples({})
+        sample_id: int = 0
+        samples: Samples = Samples({})  # Create empty samples
 
         reversed_variable_map = {v: k for k, v in self._variable_map.items()}
 
         for solution in data.qubo_solution.solutions:
-            if solution.frequency == 0:
-                continue
             # Initialize all mapped variables to zero for each solution, then
             # overwrite them with the values returned by DA4. This also supplies
             # values needed by OMMX for variables canceled from the penalty.
@@ -398,8 +385,11 @@ class OMMXDA4Adapter(SamplerAdapter):
                 raise OMMXDA4AdapterError(
                     f"Invalid solution configuration: The solution contains an unexpected decision variable id ({e})."
                 )
-            next_sample_id = sample_id + (solution.frequency if expand_frequency else 1)
-            samples.append(range(sample_id, next_sample_id), converted_configuration)
+            next_sample_id = sample_id + solution.frequency
+            samples.append(
+                sample_ids=range(sample_id, next_sample_id),
+                state=converted_configuration,
+            )
             sample_id = next_sample_id
 
         return self._ommx_instance.evaluate_samples(samples)
@@ -410,11 +400,11 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param data: The QUBO result data from DA4
         :return: Solution
         """
-        return self._evaluate_samples(data, expand_frequency=False).best_feasible
+        sample_set = self.decode_to_sampleset(data)
+        return sample_set.best_feasible
 
     def _validate_constraints(self) -> None:
         """Validate regular constraints and reject infeasible constants."""
-        atol = get_default_atol()
         supported_equalities = {
             Constraint.EQUAL_TO_ZERO,
             Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
@@ -439,8 +429,8 @@ class OMMXDA4Adapter(SamplerAdapter):
                 )
 
             if constraint_degree == 0 and not constraint.evaluate(
-                {}, atol=atol
-            ).is_feasible(atol=atol):
+                {}, atol=ABSOLUTE_TOLERANCE
+            ).is_feasible(atol=ABSOLUTE_TOLERANCE):
                 raise OMMXDA4AdapterError(
                     f"Infeasible constant constraint was found: id {constraint_id}"
                 )
@@ -460,20 +450,26 @@ class OMMXDA4Adapter(SamplerAdapter):
                 "OMMX."
             )
 
-        if instance.sense not in (Sense.Minimize, Sense.Maximize):
+        if instance.sense == Sense.Minimize:
+            function = objective
+        elif instance.sense == Sense.Maximize:
+            # DA4 only supports minimization, so multiply the objective by -1.
+            function = -objective
+        else:
             raise AssertionError(
                 "Unsupported objective sense reached after applicability validation: "
                 f"{instance.sense}. This may indicate an OMMX implementation bug; "
                 "please report it to OMMX."
             )
 
-        negate = instance.sense == Sense.Maximize
+        # get objective terms
+        terms = function.terms
+
         binary_polynomial_terms = [
             BinaryPolynomialTerm(
-                c=-value if negate else value,
-                p=self._replace_polynomials_with_variable_map(key),
+                c=value, p=self._replace_polynomials_with_variable_map(key)
             )
-            for key, value in objective.terms.items()
+            for key, value in terms.items()
         ]
 
         # DA4 starts one-way one-hot groups at the minimum polynomial variable
@@ -582,9 +578,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         else:
             return PenaltyBinaryPolynomial(terms=penalty_binary_polynomial_terms)
 
-    def _generate_inequalities(
-        self, variables: list[DecisionVariable]
-    ) -> list[Inequalities] | None:
+    def _generate_inequalities(self) -> list[Inequalities] | None:
         """Generate Inequalities from OMMX instance.
 
         :return: Inequalities
@@ -622,22 +616,6 @@ class OMMXDA4Adapter(SamplerAdapter):
                 Inequalities(terms=inequalities_terms, **{"lambda": lambda_})
             )
 
-        # A singleton binary domain is a constraint on the search. DA4 can
-        # override fixed_config, so encode x <= 0 or 1 - x <= 0 explicitly.
-        for variable in variables:
-            bound = variable.bound
-            if bound.lower != bound.upper:
-                continue
-            index = self._variable_map[variable.id]
-            if bound.lower == 0:
-                terms = [BinaryPolynomialTerm(c=1, p=[index])]
-            else:
-                terms = [
-                    BinaryPolynomialTerm(c=1, p=[]),
-                    BinaryPolynomialTerm(c=-1, p=[index]),
-                ]
-            inequalities_list.append(Inequalities(terms=terms))
-
         if len(inequalities_list) == 0:
             return None
         else:
@@ -653,23 +631,22 @@ class OMMXDA4Adapter(SamplerAdapter):
         """
         return int(bool(self._one_hot_dict))
 
-    def _generate_variable_map(
-        self, variables: list[DecisionVariable]
-    ) -> dict[int, int]:
+    def _generate_variable_map(self) -> dict[int, int]:
         """Generate variable map that represents the correspondence
         between the IDs of decision variables in ommx.Instance and the variable numbers on QuboRequest.
         """
+        instance = self._ommx_instance
         variable_map = {}
 
         # First enumerate the decision variables from one-hot constraints,
         # then enumerate the remaining decision variables afterwards.
         index = 0
 
-        for group in self._one_hot_dict.values():
-            for variable in group:
+        for variables in self._one_hot_dict.values():
+            for variable in variables:
                 variable_map[variable] = index
                 index += 1
-        for decision_variable in variables:
+        for decision_variable in instance.active_decision_variables:
             if decision_variable.kind != DecisionVariable.BINARY:
                 raise AssertionError(
                     "Unsupported decision variable kind reached after applicability "

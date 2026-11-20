@@ -1,29 +1,22 @@
-import operator
 from itertools import permutations
-from math import prod
 
 import pytest
 from ommx import (
-    Bound,
     Constraint,
     ConstraintID,
     ConstraintKind,
     DecisionVariable,
     Function,
     Instance,
-    Kind,
     OneHotConstraint,
     OneHotConstraintID,
     Sense,
-    get_default_atol,
-    set_default_atol,
 )
-from pydantic import ValidationError
 
 from ommx_da4_adapter import OMMXDA4Adapter
 from ommx_da4_adapter.adapter import ABSOLUTE_TOLERANCE
 from ommx_da4_adapter.exception import OMMXDA4AdapterError
-from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse, QuboSolution
+from ommx_da4_adapter.models import BinaryPolynomialTerm, QuboResponse
 
 
 # Function to sort based on the length of binary polynomials
@@ -390,72 +383,6 @@ def test_cubic_penalty_cancels_in_any_constraint_order(weights):
     )
 
 
-@pytest.mark.parametrize("fixed", [0, 1])
-def test_singleton_binary_bound_uses_da4_variable_number(fixed):
-    x = DecisionVariable(7, Kind.Binary, Bound(fixed, fixed))
-    y, z = DecisionVariable.binary(11), DecisionVariable.binary(13)
-    instance = Instance.from_components(
-        decision_variables=[x, y, z],
-        objective=x,
-        active_one_hot_constraints={0: OneHotConstraint(variables=[y, z])},
-        active_constraints={},
-        sense=Sense.Minimize,
-    )
-    request = OMMXDA4Adapter(instance).sampler_input
-    assert request.inequalities is not None
-    [bound] = request.inequalities
-    # Native OneHot occupies DA4 variables 0 and 1, so x maps to 2.
-    for value in (0, 1):
-        bits = [0, 1, value]
-        lhs = sum(term.c * prod(bits[i] for i in term.p) for term in bound.terms)
-        assert (lhs <= 0) == instance.evaluate({7: value, 11: 0, 13: 1}).feasible
-
-
-@pytest.mark.parametrize("count", [-1, 0.5, float("nan"), float("inf")])
-def test_invalid_frequency_rejected(count):
-    with pytest.raises(ValidationError, match="frequency"):
-        QuboSolution(energy=0, penalty_energy=0, frequency=count, configuration={})
-
-
-def test_decode_preserves_observed_frequencies_and_large_variable_ids():
-    x = DecisionVariable.binary(2**61 - 1)
-    instance = Instance.from_components(
-        decision_variables=[x],
-        objective=x,
-        active_constraints={},
-        sense=Sense.Maximize,
-    )
-    adapter = OMMXDA4Adapter(instance)
-    response = QuboResponse.model_validate(
-        {
-            "status": "Done",
-            "qubo_solution": {
-                "timing": {"solve_time": "0", "total_elapsed_time": "0"},
-                "progress": [],
-                "result_status": True,
-                "solutions": [
-                    {
-                        "energy": -1,
-                        "penalty_energy": 0,
-                        "configuration": {"0": True},
-                        "frequency": 0,
-                    },
-                    {
-                        "energy": 0,
-                        "penalty_energy": 0,
-                        "configuration": {"0": False},
-                        "frequency": 3,
-                    },
-                ],
-            },
-        }
-    )
-    samples = adapter.decode_to_sampleset(response)
-    assert samples.objectives == {0: 0, 1: 0, 2: 0}
-    assert samples.get(2).state.entries == {x.id: 0}
-    assert adapter.decode(response).state.entries == {x.id: 0}
-
-
 def test_inequalities(instance):
     adapter = OMMXDA4Adapter(instance)
     qubo_request = adapter.sampler_input
@@ -588,31 +515,20 @@ def test_no_inequalities(instance_for_no_inequalities):
     assert qubo_request.inequalities is None
 
 
-@pytest.fixture(params=[1e-6, 1e-4, 1e-9])
-def constraint_atol(request):
-    previous = get_default_atol()
-    set_default_atol(request.param)
-    try:
-        yield request.param
-    finally:
-        set_default_atol(previous)
-
-
-def test_skips_feasible_constant_constraints(constraint_atol):
+def test_skips_feasible_constant_constraints():
     x = DecisionVariable.binary(0)
     instance = Instance.from_components(
         decision_variables=[x],
         objective=x,
         active_constraints={
-            0: Function(constraint_atol / 2) == 0,
-            1: Function(-constraint_atol / 2) == 0,
-            2: Function(constraint_atol / 2) <= 0,
+            0: Function(ABSOLUTE_TOLERANCE / 2) == 0,
+            1: Function(-ABSOLUTE_TOLERANCE / 2) == 0,
+            2: Function(ABSOLUTE_TOLERANCE / 2) <= 0,
             3: Function(-1) <= 0,
         },
         sense=Sense.Minimize,
     )
 
-    assert instance.evaluate({x.id: 0}).feasible
     qubo_request = OMMXDA4Adapter(instance).sampler_input
 
     assert qubo_request.penalty_binary_polynomial is None
@@ -620,20 +536,22 @@ def test_skips_feasible_constant_constraints(constraint_atol):
 
 
 @pytest.mark.parametrize(
-    "relation",
-    [operator.eq, operator.le],
+    "constraint",
+    [
+        Function(2 * ABSOLUTE_TOLERANCE) == 0,
+        Function(2 * ABSOLUTE_TOLERANCE) <= 0,
+    ],
     ids=["equality", "less-than-or-equal"],
 )
-def test_rejects_infeasible_constant_constraint(constraint_atol, relation):
+def test_rejects_infeasible_constant_constraint(constraint):
     x = DecisionVariable.binary(0)
     instance = Instance.from_components(
         decision_variables=[x],
         objective=x,
-        active_constraints={7: relation(Function(2 * constraint_atol), 0)},
+        active_constraints={7: constraint},
         sense=Sense.Minimize,
     )
 
-    assert not instance.evaluate({x.id: 0}).feasible
     with pytest.raises(
         OMMXDA4AdapterError,
         match=r"Infeasible constant constraint was found: id ConstraintID\(7\)",
