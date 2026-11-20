@@ -28,7 +28,7 @@ ommx_sampleset = OMMXDA4Adapter.sample(
 )
 ```
 
-You can also use the adapter and client separately:
+You can also use the adapter and client separately. Keep the supplied OMMX instance unchanged from adapter construction through decoding. To edit the original problem during this time, pass `copy.copy(ommx_instance)` to the constructor.
 
 ```python
 from ommx_da4_adapter import OMMXDA4Adapter, DA4Client

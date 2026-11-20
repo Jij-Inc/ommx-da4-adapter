@@ -1,14 +1,17 @@
 import pytest
 from ommx import (
+    ConstraintID,
     DecisionVariable,
     Equality,
     Function,
+    IndicatorConstraintID,
     Instance,
     InstanceClassMismatch,
     Kind,
     OneHotConstraint,
     Sense,
     Sos1Constraint,
+    Sos1ConstraintID,
 )
 from ommx.adapter import AdapterNotApplicableError
 
@@ -22,9 +25,9 @@ def instance_with_unsupported_special_constraints() -> Instance:
     return Instance.from_components(
         decision_variables=[x, y],
         objective=x + y,
-        constraints={},
-        indicator_constraints={10: (y <= 0).with_indicator(x)},
-        sos1_constraints={30: Sos1Constraint(variables=[x, y])},
+        active_constraints={},
+        active_indicator_constraints={10: (y <= 0).with_indicator(x)},
+        active_sos1_constraints={30: Sos1Constraint(variables=[x, y])},
         sense=Sense.Minimize,
     )
 
@@ -35,11 +38,11 @@ def test_input_class_accepts_binary_quadratic_boundary(sense):
     instance = Instance.from_components(
         decision_variables=x,
         objective=x[0] * x[1] + x[2] * x[3],
-        constraints={
+        active_constraints={
             0: x[0] * x[1] == 0,
             1: x[1] + x[2] <= 1,
         },
-        one_hot_constraints={10: OneHotConstraint(variables=[x[0], x[3]])},
+        active_one_hot_constraints={10: OneHotConstraint(variables=[x[0], x[3]])},
         sense=sense,
     )
     before = instance.to_v2_bytes()
@@ -57,7 +60,7 @@ def test_rejects_cubic_objective_without_mutating_input():
     instance = Instance.from_components(
         decision_variables=x,
         objective=x[0] * x[1] * x[2],
-        constraints={},
+        active_constraints={},
         sense=Sense.Minimize,
     )
     before = instance.to_v2_bytes()
@@ -77,7 +80,7 @@ def test_rejects_cubic_equality_constraint_without_mutating_input():
     instance = Instance.from_components(
         decision_variables=x,
         objective=sum(x),
-        constraints={0: x[0] * x[1] * x[2] == 0},
+        active_constraints={0: x[0] * x[1] * x[2] == 0},
         sense=Sense.Minimize,
     )
     before = instance.to_v2_bytes()
@@ -90,7 +93,7 @@ def test_rejects_cubic_equality_constraint_without_mutating_input():
         mismatch, InstanceClassMismatch.RegularConstraintDegreeExceedsBound
     )
     assert mismatch.relation == Equality.EqualToZero
-    assert mismatch.actual_degrees == {0: 3}
+    assert mismatch.actual_degrees == {ConstraintID(0): 3}
     assert mismatch.bound.maximum_degree == 2
     assert instance.to_v2_bytes() == before
 
@@ -100,7 +103,7 @@ def test_rejects_quadratic_inequality_constraint_without_mutating_input():
     instance = Instance.from_components(
         decision_variables=x,
         objective=sum(x),
-        constraints={0: x[0] * x[1] <= 0},
+        active_constraints={0: x[0] * x[1] <= 0},
         sense=Sense.Minimize,
     )
     before = instance.to_v2_bytes()
@@ -113,7 +116,7 @@ def test_rejects_quadratic_inequality_constraint_without_mutating_input():
         mismatch, InstanceClassMismatch.RegularConstraintDegreeExceedsBound
     )
     assert mismatch.relation == Equality.LessThanOrEqualToZero
-    assert mismatch.actual_degrees == {0: 2}
+    assert mismatch.actual_degrees == {ConstraintID(0): 2}
     assert mismatch.bound.maximum_degree == 1
     assert instance.to_v2_bytes() == before
 
@@ -124,7 +127,7 @@ def test_accepts_unused_unsupported_variable_kind_without_mutating_input():
     instance = Instance.from_components(
         decision_variables=[used, unused],
         objective=used,
-        constraints={},
+        active_constraints={},
         sense=Sense.Minimize,
     )
     before = instance.to_v2_bytes()
@@ -153,7 +156,7 @@ def test_rejects_used_unsupported_variable_kinds(variable, kind):
     instance = Instance.from_components(
         decision_variables=[variable],
         objective=variable,
-        constraints={},
+        active_constraints={},
         sense=Sense.Minimize,
     )
     before = instance.to_v2_bytes()
@@ -176,7 +179,7 @@ def test_asserts_if_unsupported_variable_kind_reaches_conversion(
     instance = Instance.from_components(
         decision_variables=[x],
         objective=x,
-        constraints={},
+        active_constraints={},
         sense=Sense.Minimize,
     )
     monkeypatch.setattr(
@@ -199,7 +202,7 @@ def test_asserts_if_non_polynomial_objective_reaches_conversion(
     instance = Instance.from_components(
         decision_variables=[x],
         objective=abs(Function(x - 0.5)),
-        constraints={},
+        active_constraints={},
         sense=Sense.Minimize,
     )
     monkeypatch.setattr(
@@ -222,7 +225,7 @@ def test_asserts_if_non_polynomial_constraint_reaches_conversion(
     instance = Instance.from_components(
         decision_variables=[x],
         objective=0,
-        constraints={7: abs(Function(x - 0.5)) == 0},
+        active_constraints={7: abs(Function(x - 0.5)) == 0},
         sense=Sense.Minimize,
     )
     monkeypatch.setattr(
@@ -235,7 +238,7 @@ def test_asserts_if_non_polynomial_constraint_reaches_conversion(
         AssertionError,
         match=(
             "Non-polynomial constraint reached after applicability validation: "
-            "constraint 7"
+            r"constraint ConstraintID\(7\)"
         ),
     ):
         OMMXDA4Adapter(instance)
@@ -263,11 +266,11 @@ def test_rejects_unsupported_special_constraints_without_mutating_input(
 
     indicator = by_type[InstanceClassMismatch.IndicatorConstraintsNotAllowed]
     assert isinstance(indicator, InstanceClassMismatch.IndicatorConstraintsNotAllowed)
-    assert indicator.constraint_ids == {10}
+    assert indicator.constraint_ids == {IndicatorConstraintID(10)}
 
     sos1 = by_type[InstanceClassMismatch.Sos1ConstraintsNotAllowed]
     assert isinstance(sos1, InstanceClassMismatch.Sos1ConstraintsNotAllowed)
-    assert sos1.constraint_ids == {30}
+    assert sos1.constraint_ids == {Sos1ConstraintID(30)}
     assert instance.to_v2_bytes() == before
 
 

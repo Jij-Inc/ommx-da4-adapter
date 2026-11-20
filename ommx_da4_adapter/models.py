@@ -188,7 +188,7 @@ class Progress(pydantic.BaseModel):
 class QuboSolution(pydantic.BaseModel):
     energy: float
     penalty_energy: float
-    frequency: int
+    frequency: int = pydantic.Field(ge=0)
     configuration: dict[str, bool]
 
 
