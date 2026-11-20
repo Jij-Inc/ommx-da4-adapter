@@ -349,10 +349,9 @@ def test_inequalities_lambda_default(instance):
         assert inequality.lambda_ == 1
 
 
-@pytest.mark.parametrize("id_type", [int, ConstraintID])
-def test_inequalities_lambda(instance, id_type):
+def test_inequalities_lambda(instance):
     adapter = OMMXDA4Adapter(
-        instance, inequalities_lambda={id_type(2): 6, id_type(3): 2}
+        instance, inequalities_lambda={ConstraintID(2): 6, ConstraintID(3): 2}
     )
     qubo_request = adapter.sampler_input
 
@@ -362,6 +361,13 @@ def test_inequalities_lambda(instance, id_type):
         1: 6,
         3: 2,
     }
+
+
+def test_inequalities_lambda_rejects_integer_keys(instance):
+    with pytest.raises(
+        TypeError, match="inequalities_lambda keys must be regular ConstraintID"
+    ):
+        OMMXDA4Adapter(instance, inequalities_lambda={2: 6})
 
 
 @pytest.mark.parametrize("weights", list(permutations((1, 2, -3))))

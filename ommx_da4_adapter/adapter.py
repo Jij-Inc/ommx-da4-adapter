@@ -1,6 +1,5 @@
 import copy
 import math
-from collections.abc import Mapping
 from typing import ClassVar, Literal, final
 
 from ommx import (
@@ -100,10 +99,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         max_penalty_coef: int = 0,
         guidance_config: dict[str, bool] | None = None,
         fixed_config: dict[str, bool] | None = None,
-        inequalities_lambda: Mapping[int, int]
-        | Mapping[ConstraintID, int]
-        | Mapping[int | ConstraintID, int]
-        | None = None,
+        inequalities_lambda: dict[ConstraintID, int] | None = None,
     ):
         """Digital Annealer adapter for OMMX.
 
@@ -123,21 +119,19 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param max_penalty_coef: Maximum value of constraint term coefficients. If 0 is set, there is no maximum value
         :param guidance_config: Initial value of each variable
         :param fixed_config: Fixed value for each variable
-        :param inequalities_lambda: Coefficients keyed by regular constraint ID or its integer value. The default coefficient is 1.
+        :param inequalities_lambda: Integer coefficients keyed by regular constraint ID. The default coefficient is 1.
         """
         self.require_applicable(ommx_instance)
 
         self._ommx_instance = ommx_instance
-        self._inequalities_lambda = None
-        if inequalities_lambda is not None:
-            self._inequalities_lambda = {
-                ConstraintID(key) if isinstance(key, int) else key: value
-                for key, value in inequalities_lambda.items()
-            }
-            if len(self._inequalities_lambda) != len(inequalities_lambda):
-                raise OMMXDA4AdapterError(
-                    "Duplicate constraint ID in inequalities_lambda."
-                )
+        if inequalities_lambda is not None and any(
+            not isinstance(key, ConstraintID) for key in inequalities_lambda
+        ):
+            raise TypeError(
+                "inequalities_lambda keys must be regular ConstraintID values "
+                "(for example, ConstraintID(2))."
+            )
+        self._inequalities_lambda = inequalities_lambda
         self._validate_constraints()
 
         (
@@ -605,13 +599,11 @@ class OMMXDA4Adapter(SamplerAdapter):
                 for key, value in function.terms.items()
             ]
 
-            if (
-                self._inequalities_lambda is None
-                or constraint_id not in self._inequalities_lambda
-            ):
-                lambda_ = 1
-            else:
-                lambda_ = self._inequalities_lambda[constraint_id]
+            lambda_ = (
+                self._inequalities_lambda.get(constraint_id, 1)
+                if self._inequalities_lambda is not None
+                else 1
+            )
             inequalities_list.append(
                 Inequalities(terms=inequalities_terms, **{"lambda": lambda_})
             )
