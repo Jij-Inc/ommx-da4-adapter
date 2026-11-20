@@ -47,5 +47,3 @@ qubo_response = client.sample(qubo_request=qubo_request)
 
 ommx_sampleset = adapter.decode_to_sampleset(qubo_response)
 ```
-
-`OMMXDA4Adapter` is a final class. To implement a custom sampler adapter, subclass `ommx.adapter.SamplerAdapter`.
