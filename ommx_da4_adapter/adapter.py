@@ -22,6 +22,7 @@ from ommx import (
     Sense,
     Solution,
     SpecialConstraintPreparation,
+    get_default_atol,
 )
 from ommx.adapter import DiagnosticsSink, SamplerAdapter
 
@@ -36,8 +37,6 @@ from .models import (
     QuboRequest,
     QuboResponse,
 )
-
-ABSOLUTE_TOLERANCE = 1e-6
 
 
 class OMMXDA4Adapter(SamplerAdapter):
@@ -410,6 +409,7 @@ class OMMXDA4Adapter(SamplerAdapter):
 
     def _validate_constraints(self) -> None:
         """Validate regular constraints and reject infeasible constants."""
+        atol = get_default_atol()
         supported_equalities = {
             Constraint.EQUAL_TO_ZERO,
             Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
@@ -434,8 +434,8 @@ class OMMXDA4Adapter(SamplerAdapter):
                 )
 
             if constraint_degree == 0 and not constraint.evaluate(
-                {}, atol=ABSOLUTE_TOLERANCE
-            ).is_feasible(atol=ABSOLUTE_TOLERANCE):
+                {}, atol=atol
+            ).is_feasible(atol=atol):
                 raise OMMXDA4AdapterError(
                     f"Infeasible constant constraint was found: id {constraint_id}"
                 )
