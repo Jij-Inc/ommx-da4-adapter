@@ -1,9 +1,11 @@
 import copy
 import math
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, final
 
 from ommx import (
     Constraint,
+    ConstraintID,
+    ConstraintKind,
     DecisionVariable,
     Equality,
     Function,
@@ -12,15 +14,14 @@ from ommx import (
     InstanceClassClause,
     Kind,
     Linear,
+    OneHotConstraintID,
     PolynomialRequirement,
     PreparationPolicy,
     Samples,
     SampleSet,
     Sense,
     Solution,
-    SpecialConstraintKind,
     SpecialConstraintPreparation,
-    State,
 )
 from ommx.adapter import DiagnosticsSink, SamplerAdapter
 
@@ -39,6 +40,7 @@ from .models import (
 ABSOLUTE_TOLERANCE = 1e-6
 
 
+@final
 class OMMXDA4Adapter(SamplerAdapter):
     INPUT_CLASS: ClassVar[InstanceClass] = InstanceClass(
         [
@@ -72,8 +74,8 @@ class OMMXDA4Adapter(SamplerAdapter):
         return PreparationPolicy(
             special_constraints=SpecialConstraintPreparation.lower_special_constraints(
                 kinds={
-                    SpecialConstraintKind.Indicator,
-                    SpecialConstraintKind.Sos1,
+                    ConstraintKind.Indicator,
+                    ConstraintKind.Sos1,
                 }
             )
         )
@@ -97,7 +99,7 @@ class OMMXDA4Adapter(SamplerAdapter):
         max_penalty_coef: int = 0,
         guidance_config: dict[str, bool] | None = None,
         fixed_config: dict[str, bool] | None = None,
-        inequalities_lambda: dict[int, int] | None = None,
+        inequalities_lambda: dict[ConstraintID, int] | None = None,
     ):
         """Digital Annealer adapter for OMMX.
 
@@ -117,11 +119,20 @@ class OMMXDA4Adapter(SamplerAdapter):
         :param max_penalty_coef: Maximum value of constraint term coefficients. If 0 is set, there is no maximum value
         :param guidance_config: Initial value of each variable
         :param fixed_config: Fixed value for each variable
-        :param inequalities_lambda: Coefficient of inequality. If omitted, set to 1. Defaults to None.
+        :param inequalities_lambda: DA4 inequality weights keyed by OMMX ``ConstraintID``.
+            Each weight must be an integer from 1 to 1,000,000,000 inclusive.
+            Inequalities without a specified weight use 1.
         """
         self.require_applicable(ommx_instance)
 
         self._ommx_instance = ommx_instance
+        if inequalities_lambda is not None and any(
+            not isinstance(key, ConstraintID) for key in inequalities_lambda
+        ):
+            raise TypeError(
+                "inequalities_lambda keys must be regular ConstraintID values "
+                "(for example, ConstraintID(2))."
+            )
         self._inequalities_lambda = inequalities_lambda
         self._validate_constraints()
 
@@ -372,8 +383,8 @@ class OMMXDA4Adapter(SamplerAdapter):
                 )
             next_sample_id = sample_id + solution.frequency
             samples.append(
-                sample_ids=[i for i in range(sample_id, next_sample_id)],
-                state=State(entries=converted_configuration),
+                sample_ids=range(sample_id, next_sample_id),
+                state=converted_configuration,
             )
             sample_id = next_sample_id
 
@@ -394,7 +405,9 @@ class OMMXDA4Adapter(SamplerAdapter):
             Constraint.EQUAL_TO_ZERO,
             Constraint.LESS_THAN_OR_EQUAL_TO_ZERO,
         }
-        for constraint_id, constraint in self._ommx_instance.constraints.items():
+        for constraint_id, constraint in self._ommx_instance.active_constraints.of_kind(
+            ConstraintKind.Regular
+        ).items():
             if constraint.equality not in supported_equalities:
                 raise AssertionError(
                     "Unsupported constraint equality reached after applicability "
@@ -411,16 +424,15 @@ class OMMXDA4Adapter(SamplerAdapter):
                     "implementation bug; please report it to OMMX."
                 )
 
-            if (
-                constraint_degree == 0
-                and not constraint.evaluate({}, atol=ABSOLUTE_TOLERANCE).feasible
-            ):
+            if constraint_degree == 0 and not constraint.evaluate(
+                {}, atol=ABSOLUTE_TOLERANCE
+            ).is_feasible(atol=ABSOLUTE_TOLERANCE):
                 raise OMMXDA4AdapterError(
                     f"Infeasible constant constraint was found: id {constraint_id}"
                 )
 
     def _generate_binary_polynomial(self) -> BinaryPolynomial:
-        """Generate BinaryPolynomial from OMMX instance."
+        """Generate BinaryPolynomial from OMMX instance.
 
         :return: BinaryPolynomial
         """
@@ -501,16 +513,19 @@ class OMMXDA4Adapter(SamplerAdapter):
             for key, value in squared_function.terms.items():
                 add_term(key, value)
 
-        for constraint in instance.constraints.values():
+        for constraint in instance.active_constraints.of_kind(
+            ConstraintKind.Regular
+        ).values():
             # skip if not equality constraints
             if constraint.equality != Constraint.EQUAL_TO_ZERO:
                 continue
 
             # Feasible constant constraints were validated before conversion.
-            if constraint.function.degree() == 0:
+            function = constraint.function
+            if function.degree() == 0:
                 continue
 
-            add_squared_terms(constraint.function)
+            add_squared_terms(function)
 
         # DA4 one-way one-hot groups cannot share decision variables. Treat each
         # group not passed to one_way_one_hot_groups as the regular equality
@@ -567,30 +582,30 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         inequalities_list = []
-        for constraint_id, constraint in instance.constraints.items():
+        for constraint_id, constraint in instance.active_constraints.of_kind(
+            ConstraintKind.Regular
+        ).items():
             # skip if not inequality constraints
             if constraint.equality != Constraint.LESS_THAN_OR_EQUAL_TO_ZERO:
                 continue
 
             # Feasible constant constraints were validated before conversion.
-            if constraint.function.degree() == 0:
+            function = constraint.function
+            if function.degree() == 0:
                 continue
 
-            terms = constraint.function.terms
             inequalities_terms = [
                 BinaryPolynomialTerm(
                     c=value, p=self._replace_polynomials_with_variable_map(key)
                 )
-                for key, value in terms.items()
+                for key, value in function.terms.items()
             ]
 
-            if (
-                self._inequalities_lambda is None
-                or constraint_id not in self._inequalities_lambda
-            ):
-                lambda_ = 1
-            else:
-                lambda_ = self._inequalities_lambda[constraint_id]
+            lambda_ = (
+                self._inequalities_lambda.get(constraint_id, 1)
+                if self._inequalities_lambda is not None
+                else 1
+            )
             inequalities_list.append(
                 Inequalities(terms=inequalities_terms, **{"lambda": lambda_})
             )
@@ -625,7 +640,7 @@ class OMMXDA4Adapter(SamplerAdapter):
             for variable in variables:
                 variable_map[variable] = index
                 index += 1
-        for decision_variable in instance.used_decision_variables:
+        for decision_variable in instance.active_decision_variables:
             if decision_variable.kind != DecisionVariable.BINARY:
                 raise AssertionError(
                     "Unsupported decision variable kind reached after applicability "
@@ -668,7 +683,9 @@ class OMMXDA4Adapter(SamplerAdapter):
 
     def _partition_one_hot_constraints(
         self,
-    ) -> tuple[dict[int, list[int]], dict[int, list[int]]]:
+    ) -> tuple[
+        dict[OneHotConstraintID, list[int]], dict[OneHotConstraintID, list[int]]
+    ]:
         """Partition one-hot constraints into one_way_one_hot_groups and penalty handling.
 
         Examples:
@@ -699,13 +716,13 @@ class OMMXDA4Adapter(SamplerAdapter):
         instance = self._ommx_instance
 
         sorted_one_hot_constraints = sorted(
-            instance.one_hot_constraints.items(),
+            instance.active_constraints.of_kind(ConstraintKind.OneHot).items(),
             key=lambda item: len(item[1].variables),
             reverse=True,
         )
 
-        one_hot_dict: dict[int, list[int]] = {}
-        penalty_one_hot_dict: dict[int, list[int]] = {}
+        one_hot_dict: dict[OneHotConstraintID, list[int]] = {}
+        penalty_one_hot_dict: dict[OneHotConstraintID, list[int]] = {}
         used_variables: set[int] = set()
         for constraint_id, one_hot_constraint in sorted_one_hot_constraints:
             variables = list(one_hot_constraint.variables)
